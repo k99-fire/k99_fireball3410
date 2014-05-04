@@ -1,6 +1,6 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
- * HTC: fighter machine driver which defines board-specific data
+ * HTC: jet machine driver which defines board-specific data
  * Copy from sound/soc/msm/msm8960.c
  *
  * This program is free software; you can redistribute it and/or modify
@@ -31,9 +31,8 @@
 #include <mach/htc_acoustic_8960.h>
 #include "../../../sound/soc/codecs/wcd9310.h"
 #include "../sound/soc/msm/msm-pcm-routing.h"
-#include "board-fighter.h"
+#include "board-jet.h"
 
-#include <mach/cable_detect.h>
 #include <mach/board.h>
 
 static atomic_t q6_effect_mode = ATOMIC_INIT(-1);
@@ -59,7 +58,7 @@ static atomic_t q6_effect_mode = ATOMIC_INIT(-1);
 
 #define TABLA_EXT_CLK_RATE 12288000
 
-#define PAMP_GPIO	(PM8921_GPIO_PM_TO_SYS(FIGHTER_PMGPIO_AUD_AMP_EN))
+#define PAMP_GPIO	(PM8921_GPIO_PM_TO_SYS(JET_PMGPIO_AUD_AMP_EN))
 
 static int msm8960_spk_control;
 static int msm8960_ext_bottom_spk_pamp;
@@ -1410,13 +1409,13 @@ static struct snd_soc_card snd_soc_card_msm8960 = {
 		.num_controls = ARRAY_SIZE(tabla_msm8960_controls),
 };
 
-void fighter_set_q6_effect_mode(int mode)
+void jet_set_q6_effect_mode(int mode)
 {
 	pr_aud_info("%s: mode %d\n", __func__, mode);
 	atomic_set(&q6_effect_mode, mode);
 }
 
-int fighter_get_q6_effect_mode(void)
+int jet_get_q6_effect_mode(void)
 {
 	int mode = atomic_read(&q6_effect_mode);
 	pr_aud_info("%s: mode %d\n", __func__, mode);
@@ -1424,21 +1423,21 @@ int fighter_get_q6_effect_mode(void)
 }
 
 static struct acoustic_ops acoustic = {
-	.set_q6_effect = fighter_set_q6_effect_mode,
+	.set_q6_effect = jet_set_q6_effect_mode,
 };
 
 static struct q6asm_ops qops = {
-	.get_q6_effect = fighter_get_q6_effect_mode,
+	.get_q6_effect = jet_get_q6_effect_mode,
 };
 
 static struct msm_pcm_routing_ops rops = {
-	.get_q6_effect = fighter_get_q6_effect_mode,
+	.get_q6_effect = jet_get_q6_effect_mode,
 };
 
 static struct platform_device *msm8960_snd_device;
 static struct platform_device *msm8960_snd_tabla1x_device;
 
-static int __init fighter_audio_init(void)
+static int __init jet_audio_init(void)
 {
 	int ret = 0, rc = 0;
 	struct pm_gpio param = {
@@ -1494,9 +1493,9 @@ static int __init fighter_audio_init(void)
 		return ret;
 	}
 
-	rc = gpio_request(PM8921_GPIO_PM_TO_SYS(FIGHTER_PMGPIO_AUD_AMP_EN),
-					"fighter_en");
-	rc = pm8xxx_gpio_config(PM8921_GPIO_PM_TO_SYS(FIGHTER_PMGPIO_AUD_AMP_EN),
+	rc = gpio_request(PM8921_GPIO_PM_TO_SYS(JET_PMGPIO_AUD_AMP_EN),
+					"jet_en");
+	rc = pm8xxx_gpio_config(PM8921_GPIO_PM_TO_SYS(JET_PMGPIO_AUD_AMP_EN),
 			&param);
 	if (rc < 0)
 		pr_aud_err("failed to configure tpa2051_en gpio\n");
@@ -1508,9 +1507,9 @@ static int __init fighter_audio_init(void)
 	return ret;
 
 }
-late_initcall(fighter_audio_init);
+late_initcall(jet_audio_init);
 
-static void __exit fighter_audio_exit(void)
+static void __exit jet_audio_exit(void)
 {
 
 	if (!cpu_is_msm8960()) {
@@ -1524,7 +1523,7 @@ static void __exit fighter_audio_exit(void)
 	gpio_free(PAMP_GPIO);
 	mutex_destroy(&cdc_mclk_mutex);
 }
-module_exit(fighter_audio_exit);
+module_exit(jet_audio_exit);
 
-MODULE_DESCRIPTION("ALSA Platform Fighter");
+MODULE_DESCRIPTION("ALSA Platform Jet");
 MODULE_LICENSE("GPL v2");

@@ -25,9 +25,22 @@
 #include <linux/fb.h>
 #endif
 
+struct dcs_cmd_req cmdreq;
+
 static struct dsi_buf fighter_panel_tx_buf;
 static struct dsi_buf fighter_panel_rx_buf;
-
+#if 0
+static struct dsi_cmd_desc *video_on_cmds = NULL;
+static struct dsi_cmd_desc *command_on_cmds = NULL;
+static struct dsi_cmd_desc *display_off_cmds = NULL;
+static struct dsi_cmd_desc *cmd_backlight_cmds = NULL;
+#endif
+#if defined CONFIG_FB_MSM_SELF_REFRESH
+static struct dsi_cmd_desc *fighter_video_to_cmd = NULL;
+static struct dsi_cmd_desc *fighter_cmd_to_video = NULL;
+#endif
+static char ptype[60] = "PANEL type = ";
+int bl_level_prevset = 1;
 
 static char sw_reset[2] = {0x01, 0x00}; /* DTYPE_DCS_WRITE */
 static char enter_sleep[2] = {0x10, 0x00}; /* DTYPE_DCS_WRITE */
@@ -49,11 +62,11 @@ static char led_pwm1[2] = {0x51, 0xF0};	/* DTYPE_DCS_WRITE1 */
 static char led_pwm2[2] = {0x53, 0x24}; /* DTYPE_DCS_WRITE1 */
 static char led_pwm3[2] = {0x55, 0x00}; /* DTYPE_DCS_WRITE1 */
 
+static char enable_te[2] = {0x35, 0x00};/* DTYPE_DCS_WRITE1 */
+
 static char max_pktsize[2] = {MIPI_DSI_MRPS, 0x00}; /* LSB tx first, 16 bytes */
 
 static char novatek_e0[3] = {0xE0, 0x01, 0x03}; /* DTYPE_DCS_LWRITE */
-
-static char enable_te[2] = {0x35, 0x00};/* DTYPE_DCS_WRITE1 */
 
 static bool isorise;
 
@@ -874,7 +887,7 @@ static unsigned char pwm_freq_sel_cmds2[] = {0xC6, 0x00}; /* CABC command with p
 static unsigned char pwm_dbf_cmds1[] = {0x00, 0xB1}; /* address shift to PWM DBF */
 static unsigned char pwm_dbf_cmds2[] = {0xC6, 0x04}; /* CABC command-- DBF: [2:1], force duty: [0] */
 
-/* disable video mdoe */
+/* disable video mode */
 static unsigned char no_video_mode1[] = {0x00, 0x93};
 static unsigned char no_video_mode2[] = {0xB0, 0xB7};
 /* disable TE wait VSYNC */
@@ -1740,6 +1753,139 @@ static struct dsi_cmd_desc novatek_display_off_lg_cmds[] = {
 		sizeof(enter_sleep), enter_sleep}
 };
 
+#if defined CONFIG_FB_MSM_SELF_REFRESH
+#define DSI_VIDEO_BASE	0xE0000
+static struct msm_panel_common_pdata *mipi_fighter_pdata;
+static char display_mode_video_cmd_1[2] = {0xC2, 0x0B}; 
+static char display_mode_video_cmd_2[2] = {0xC2, 0x00}; 
+
+static struct dsi_cmd_desc video_to_cmd[] = {
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 20,
+		sizeof(display_mode_video_cmd_1), display_mode_video_cmd_1},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
+		sizeof(display_mode_video_cmd_2), display_mode_video_cmd_2},
+};
+
+static struct dsi_cmd_desc cmd_to_video[] = {
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
+		sizeof(display_mode_video), display_mode_video},
+};
+
+static void disable_video_mode_clk(void)
+{
+	
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0x175);
+}
+
+static void enable_video_mode_clk(void)
+{
+	
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0x173);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 1);
+}
+
+static DECLARE_WAIT_QUEUE_HEAD(fighter_vsync_wait);
+static unsigned int vsync_irq;
+static int wait_vsync = 0;
+static int fighter_vsync_gpio = 0;
+static int fighter_irq_cnt = 0;    
+
+static irqreturn_t fighter_vsync_interrupt(int irq, void *data)
+{
+	fighter_irq_cnt++;
+	if (wait_vsync) {
+		PR_DISP_DEBUG("Wait vsync\n");
+		fighter_vsync_gpio = 1;
+		wake_up(&fighter_vsync_wait);
+		wait_vsync = 0;
+	}
+
+	return IRQ_HANDLED;
+}
+
+static int setup_vsync(struct platform_device *pdev, int init)
+{
+	int ret;
+	int gpio = 0;
+
+	PR_DISP_INFO("%s+++\n", __func__);
+
+	if (!init) {
+		ret = 0;
+		goto uninit;
+	}
+	ret = gpio_request(gpio, "vsync");
+	if (ret)
+		goto err_request_gpio_failed;
+
+	ret = gpio_direction_input(gpio);
+	if (ret)
+		goto err_gpio_direction_input_failed;
+
+	ret = vsync_irq = gpio_to_irq(gpio);
+	if (ret < 0)
+		goto err_get_irq_num_failed;
+
+	ret = request_irq(vsync_irq, fighter_vsync_interrupt, IRQF_TRIGGER_RISING,
+			  "vsync", pdev);
+	if (ret)
+		goto err_request_irq_failed;
+	PR_DISP_INFO("vsync on gpio %d now %d\n",
+	       gpio, gpio_get_value(gpio));
+	disable_irq(vsync_irq);
+
+	PR_DISP_INFO("%s---\n", __func__);
+	return 0;
+
+uninit:
+	free_irq(gpio_to_irq(gpio), pdev);
+err_request_irq_failed:
+err_get_irq_num_failed:
+err_gpio_direction_input_failed:
+	gpio_free(gpio);
+err_request_gpio_failed:
+	return ret;
+}
+#endif
+static char disable_dim_cmd[2] = {0x53, 0x24};
+static struct dsi_cmd_desc disable_dim[] = {{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(disable_dim_cmd), disable_dim_cmd},};
+static struct dsi_cmd_desc *dim_cmds = disable_dim; 
+#ifdef CONFIG_FB_MSM_CABC
+static char cabc_off_cmd[2] = {0x55, 0x80};
+static struct dsi_cmd_desc cabc_off[] = {{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(cabc_off_cmd), cabc_off_cmd},};
+static char cabc_on_ui_cmd[2] = {0x55, 0x81};
+static struct dsi_cmd_desc cabc_on_ui[] = {{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(cabc_on_ui_cmd), cabc_on_ui_cmd},};
+static char cabc_on_still_cmd[2] = {0x55, 0x82};
+static struct dsi_cmd_desc cabc_on_still[] = {{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(cabc_on_still_cmd), cabc_on_still_cmd},};
+static char cabc_on_moving_cmd[2] = {0x55, 0x83};
+static struct dsi_cmd_desc cabc_on_moving[] = {{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(cabc_on_moving_cmd), cabc_on_moving_cmd},};
+static char enable_dim_cmd[2] = {0x53, 0x2C};
+static struct dsi_cmd_desc enable_dim[] = {{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(enable_dim_cmd), enable_dim_cmd},};
+static struct dsi_cmd_desc *cabc_cmds = cabc_off; 
+
+void enable_ic_cabc(int cabc, bool dim_on, struct msm_fb_data_type *mfd)
+{
+	if (dim_on)
+		dim_cmds = enable_dim;
+	if (cabc == 1)
+		cabc_cmds = cabc_on_ui;
+	else if (cabc == 2)
+		cabc_cmds = cabc_on_still;
+	else if (cabc == 3)
+		cabc_cmds = cabc_on_moving;
+	
+	cmdreq.cmds = enable_dim;
+	cmdreq.cmds_cnt = ARRAY_SIZE(enable_dim);
+	cmdreq.flags = CMD_REQ_COMMIT;
+	cmdreq.rlen = 0;
+	cmdreq.cb = NULL;
+	mipi_dsi_cmdlist_put(&cmdreq);
+	PR_DISP_INFO("%s: enable dimming and cabc\n", __func__);
+
+}
+#endif
+
 static char manufacture_id[2] = {0x04, 0x00}; /* DTYPE_DCS_READ */
 
 static struct dsi_cmd_desc novatek_manufacture_id_cmd = {
@@ -1763,8 +1909,8 @@ static uint32 fighter_manufacture_id(struct msm_fb_data_type *mfd)
 	return *lp;
 }
 
-#define PWM_MIN                   7
-#define PWM_DEFAULT               91
+#define PWM_MIN                   6
+#define PWM_DEFAULT               78
 #define PWM_MAX                   255
 
 #define BRI_SETTING_MIN                 30
@@ -1794,20 +1940,93 @@ static unsigned char fighter_shrink_pwm(int val)
 	return shrink_br;
 }
 
-static int bl_level_old;
+#if defined CONFIG_FB_MSM_SELF_REFRESH
+static void fighter_self_refresh_switch(int on)
+{
+	int vsync_timeout;
+
+	if (on) {
+		PR_DISP_DEBUG("[SR] %s on\n", __func__);
+		mipi_set_tx_power_mode(0);
+
+		cmdreq.cmds = fighter_video_to_cmd,;
+		cmdreq.cmds_cnt = ARRAY_SIZE(fighter_video_to_cmd);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+		mipi_dsi_cmdlist_put(&cmdreq);
+
+		mipi_set_tx_power_mode(1);
+		disable_video_mode_clk();
+	} else {
+		PR_DISP_DEBUG("[SR] %s off\n", __func__);
+		fighter_irq_cnt = 0;
+		mipi_set_tx_power_mode(0);
+		enable_irq(vsync_irq);
+		wait_vsync = 1;
+		vsync_timeout = wait_event_timeout(fighter_vsync_wait, fighter_vsync_gpio ||
+					gpio_get_value(0), HZ/2);
+
+		fighter_vsync_gpio = 0;
+
+		cmdreq.cmds = fighter_cmd_to_video;
+		cmdreq.cmds_cnt = ARRAY_SIZE(fighter_cmd_to_video);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+		mipi_dsi_cmdlist_put(&cmdreq);
+
+		wait_vsync = 1;
+		vsync_timeout = wait_event_timeout(fighter_vsync_wait, fighter_vsync_gpio ||
+					gpio_get_value(0), HZ/2);
+		if (fighter_irq_cnt > 2)
+			PR_DISP_DEBUG("[SR] vsync_count:%d\n", fighter_irq_cnt);
+		mipi_dsi_sw_reset();
+		enable_video_mode_clk();
+		disable_irq(vsync_irq);
+		fighter_vsync_gpio = 0;
+		if (vsync_timeout == 0)
+			PR_DISP_DEBUG("Lost vsync!\n");
+	}
+}
+#endif
+
+static void fighter_display_on(struct msm_fb_data_type *mfd)
+{
+	/* The Orise-Sony panel need to set display on after first frame sent */
+	/*
+	if (panel_type != PANEL_ID_FIGHTER_SONY_OTM && panel_type != PANEL_ID_FIGHTER_SONY_OTM_C1_1)
+		return;
+	*/
+
+	if (isorise) {
+		cmdreq.cmds = sony_orise9608a_panel_display_on;
+		cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_panel_display_on);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+	} else {
+		cmdreq.cmds = novatek_panel_display_on;
+		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_panel_display_on);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+	}
+	mipi_dsi_cmdlist_put(&cmdreq);
+}
 
 static void fighter_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 {
 	struct mipi_panel_info *mipi;
 
 	mipi  = &mfd->panel_info.mipi;
-	if (bl_level_old == mfd->bl_level)
+	if (bl_level_prevset == mfd->bl_level)
 		return;
 
+	led_pwm1[1] = fighter_shrink_pwm(mfd->bl_level);
+	
 	mutex_lock(&mfd->dma->ov_mutex);
 	/* mdp4_dsi_cmd_busy_wait: will turn on dsi clock also */
-
-	led_pwm1[1] = fighter_shrink_pwm(mfd->bl_level);
 
 /* Remove the check first for impact MFG test. Command by adb to set backlight not work */
 #if 0
@@ -1817,11 +2036,25 @@ static void fighter_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	}
 #endif
 
+	if (mfd->bl_level == 0) {
+		cmdreq.cmds = disable_dim;
+		cmdreq.cmds_cnt = ARRAY_SIZE(disable_dim);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+		mipi_dsi_cmdlist_put(&cmdreq);
+	}
 
-	mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_cmd_backlight_cmds,
-			ARRAY_SIZE(novatek_cmd_backlight_cmds));
-	bl_level_old = mfd->bl_level;
+	cmdreq.cmds = novatek_cmd_backlight_cmds;
+	cmdreq.cmds_cnt = ARRAY_SIZE(novatek_cmd_backlight_cmds);
+	cmdreq.flags = CMD_REQ_COMMIT;
+	cmdreq.rlen = 0;
+	cmdreq.cb = NULL;
+	mipi_dsi_cmdlist_put(&cmdreq);
+
+	bl_level_prevset = mfd->bl_level;
 	mutex_unlock(&mfd->dma->ov_mutex);
+
 	return;
 }
 
@@ -1841,47 +2074,103 @@ static int fighter_lcd_on(struct platform_device *pdev)
 	mipi  = &mfd->panel_info.mipi;
 
 	if (mipi->mode == DSI_VIDEO_MODE) {
-		mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_video_on_cmds,
-			ARRAY_SIZE(novatek_video_on_cmds));
+		if (!mipi_lcd_on) {
+			if (panel_type != PANEL_ID_NONE) {
+				PR_DISP_INFO("%s: %s\n", __func__, ptype);
+
+				cmdreq.cmds = novatek_video_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_video_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);
+			} else
+				PR_DISP_ERR("%s: panel_type is not supported!(%d)", __func__, panel_type);
+		}
 	} else {
 		if (!mipi_lcd_on) {
 			mipi_dsi_cmd_bta_sw_trigger(); /* clean up ack_err_status */
 			if (panel_type == PANEL_ID_FIGHTER_SAMSUNG_NT) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_SAMSUNG_NT\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_cmd_on_cmds,
-					ARRAY_SIZE(novatek_cmd_on_cmds));
+				cmdreq.cmds = novatek_cmd_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_cmd_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_SAMSUNG_NT_C2) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_SAMSUNG_NT_C2\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_c2_cmd_on_cmds,
-					ARRAY_SIZE(novatek_c2_cmd_on_cmds));
+				cmdreq.cmds = novatek_c2_cmd_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_c2_cmd_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_SAMSUNG_NT_C3) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_SAMSUNG_NT_C3\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_c3_cmd_on_cmds,
-					ARRAY_SIZE(novatek_c3_cmd_on_cmds));
+				cmdreq.cmds = novatek_c3_cmd_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_c3_cmd_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_LG_NT) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_LG_NT\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, lg_novatek_cmd_on_cmds,
-					ARRAY_SIZE(lg_novatek_cmd_on_cmds));
+				cmdreq.cmds = lg_novatek_cmd_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(lg_novatek_cmd_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_LG_NT_C2) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_LG_NT_C2\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, lg_novatek_c2_cmd_on_cmds,
-					ARRAY_SIZE(lg_novatek_c2_cmd_on_cmds));
+				cmdreq.cmds = lg_novatek_c2_cmd_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(lg_novatek_c2_cmd_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_LG_NT_MP) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_LG_NT_MP\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, lg_novatek_mp_cmd_on_cmds,
-					ARRAY_SIZE(lg_novatek_mp_cmd_on_cmds));
+				cmdreq.cmds = lg_novatek_mp_cmd_on_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(lg_novatek_mp_cmd_on_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_SONY_OTM) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_SONY_OTM\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, sony_orise9608a_panel_cmd_mode_cmds,
-					ARRAY_SIZE(sony_orise9608a_panel_cmd_mode_cmds));
+				cmdreq.cmds = sony_orise9608a_panel_cmd_mode_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_panel_cmd_mode_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_SONY_OTM_C1_1) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_SONY_OTM_C1_1\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, sony_orise9608a_c1_1_panel_cmd_mode_cmds,
-					ARRAY_SIZE(sony_orise9608a_c1_1_panel_cmd_mode_cmds));
+				cmdreq.cmds = sony_orise9608a_c1_1_panel_cmd_mode_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_c1_1_panel_cmd_mode_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			} else if (panel_type == PANEL_ID_FIGHTER_SONY_OTM_MP) {
 				PR_DISP_INFO("fighter_lcd_on PANEL_ID_FIGHTER_SONY_OTM_MP\n");
-				mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, sony_orise9608a_mp_panel_cmd_mode_cmds,
-					ARRAY_SIZE(sony_orise9608a_mp_panel_cmd_mode_cmds));
+				cmdreq.cmds = sony_orise9608a_mp_panel_cmd_mode_cmds;
+				cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_mp_panel_cmd_mode_cmds);
+				cmdreq.flags = CMD_REQ_COMMIT;
+				cmdreq.rlen = 0;
+				cmdreq.cb = NULL;
+				mipi_dsi_cmdlist_put(&cmdreq);	
+
 			}
 		}
 		mipi_dsi_cmd_bta_sw_trigger(); /* clean up ack_err_status */
@@ -1891,31 +2180,6 @@ static int fighter_lcd_on(struct platform_device *pdev)
 	mipi_lcd_on = 1;
 
 	return 0;
-}
-
-static void fighter_display_on(struct msm_fb_data_type *mfd)
-{
-	/* The Orise-Sony panel need to set display on after first frame sent */
-	/*
-	if (panel_type != PANEL_ID_FIGHTER_SONY_OTM && panel_type != PANEL_ID_FIGHTER_SONY_OTM_C1_1)
-		return;
-	*/
-	mutex_lock(&mfd->dma->ov_mutex);
-
-	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
-		mdp4_dsi_cmd_dma_busy_wait(mfd);
-		mdp4_dsi_blt_dmap_busy_wait(mfd);
-		mipi_dsi_mdp_busy_wait(mfd);
-	}
-	if (isorise) {
-		mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, sony_orise9608a_panel_display_on,
-			ARRAY_SIZE(sony_orise9608a_panel_display_on));
-	} else {
-		mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_panel_display_on,
-			ARRAY_SIZE(novatek_panel_display_on));
-	}
-
-	mutex_unlock(&mfd->dma->ov_mutex);
 }
 
 static int fighter_lcd_off(struct platform_device *pdev)
@@ -1928,21 +2192,30 @@ static int fighter_lcd_off(struct platform_device *pdev)
 		return -ENODEV;
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
+
 	if (!mipi_lcd_on)
 		return 0;
 
 	/* Remove mutex temporarily*/
 	/*mutex_lock(&mfd->dma->ov_mutex);*/
 	if (isorise) {
-		mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_display_off_cmds,
-				ARRAY_SIZE(novatek_display_off_cmds));
+		cmdreq.cmds = novatek_display_off_cmds;
+		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_display_off_cmds);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+		mipi_dsi_cmdlist_put(&cmdreq);
 	} else {
-		mipi_dsi_cmds_tx(mfd, &fighter_panel_tx_buf, novatek_display_off_lg_cmds,
-				ARRAY_SIZE(novatek_display_off_lg_cmds));
+		cmdreq.cmds = novatek_display_off_lg_cmds;
+		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_display_off_lg_cmds);
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+		mipi_dsi_cmdlist_put(&cmdreq);
 	}
 
 	/*mutex_unlock(&mfd->dma->ov_mutex);*/
-	bl_level_old = 0;
+	bl_level_prevset = 0;
 	mipi_lcd_on = 0;
 
 	return 0;
@@ -1952,6 +2225,9 @@ static int fighter_lcd_off(struct platform_device *pdev)
 
 static void fighter_set_backlight(struct msm_fb_data_type *mfd)
 {
+	int bl_level;
+
+	bl_level = mfd->bl_level;
 	if (!mfd->panel_power_on)
 		return;
 
@@ -1960,6 +2236,16 @@ static void fighter_set_backlight(struct msm_fb_data_type *mfd)
 
 static int __devinit fighter_lcd_probe(struct platform_device *pdev)
 {
+#if defined CONFIG_FB_MSM_SELF_REFRESH
+	int ret;
+	mipi_fighter_pdata = pdev->dev.platform_data;
+
+	ret = setup_vsync(pdev, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "mipi_fighter_setup_vsync failed\n");
+		return ret;
+	}
+#endif
 	msm_fb_add_device(pdev);
 
 	return 0;
@@ -1983,8 +2269,14 @@ static struct platform_driver this_driver = {
 static struct msm_fb_panel_data novatek_panel_data = {
 	.on		= fighter_lcd_on,
 	.off		= fighter_lcd_off,
-	.set_backlight = fighter_set_backlight,
+	.set_backlight	= fighter_set_backlight,
+#if defined CONFIG_FB_MSM_SELF_REFRESH
+	.self_refresh_switch = fighter_self_refresh_switch,
+#endif
 	.display_on = fighter_display_on,
+#ifdef CONFIG_FB_MSM_CABC
+	.enable_cabc = enable_ic_cabc,
+#endif
 };
 
 static int ch_used[3];
@@ -2029,7 +2321,7 @@ err_device_put:
 
 static struct msm_panel_info pinfo;
 
-static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = {
+static struct mipi_dsi_phy_ctrl dsi_fig_cmd_mode_phy_db = {
 
 /* DSI_BIT_CLK at 482MHz, 2 lane, RGB888 */
 		/* regulator */
@@ -2112,18 +2404,26 @@ static int mipi_cmd_novatek_blue_qhd_pt_init(void)
 	pinfo.mipi.stream = 0;	/* dma_p */
 	pinfo.mipi.mdp_trigger = DSI_CMD_TRIGGER_NONE;
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
+#ifdef CONFIG_FB_MSM_SELF_REFRESH
+	fighter_panel_data.self_refresh_switch = NULL; 
+#endif
 	pinfo.mipi.te_sel = 1; /* TE from vsycn gpio */
 	pinfo.mipi.interleave_max = 1;
 	pinfo.mipi.insert_dcs_cmd = TRUE;
 	pinfo.mipi.wr_mem_continue = 0x3c;
 	pinfo.mipi.wr_mem_start = 0x2c;
-	pinfo.mipi.dsi_phy_db = &dsi_cmd_mode_phy_db;
-
+	pinfo.mipi.dsi_phy_db = &dsi_fig_cmd_mode_phy_db;
+#ifdef CONFIG_FB_MSM_SELF_REFRESH
+	fighter_panel_data.self_refresh_switch = NULL;
+#endif
 	ret = mipi_fighter_device_register(&pinfo, MIPI_DSI_PRIM,
 						MIPI_DSI_PANEL_WVGA_PT);
 	if (ret)
 		PR_DISP_ERR("%s: failed to register device!\n", __func__);
-
+#if defined CONFIG_FB_MSM_SELF_REFRESH
+	fighter_video_to_cmd = video_to_cmd;
+	fighter_cmd_to_video = cmd_to_video;
+#endif
 	return ret;
 }
 
@@ -2159,7 +2459,6 @@ static int mipi_dsi_panel_power(int on)
 			return -ENODEV;
 		}
 
-
 		v_dsivdd = regulator_get(&msm_mipi_dsi1_device.dev,
 				dsivdd_str);
 		if (IS_ERR(v_dsivdd)) {
@@ -2180,11 +2479,12 @@ static int mipi_dsi_panel_power(int on)
 			return -EINVAL;
 		}
 
-		rc = gpio_request(FIGHTER_LCD_RSTz, "LCM_RST_N");
+		rc = gpio_request(FIGHTER_GPIO_LCD_RSTz, "LCM_RST_N");
 		if (rc) {
-			PR_DISP_ERR("%s:LCM gpio %d request failed, rc=%d\n", __func__,  FIGHTER_LCD_RSTz, rc);
+			PR_DISP_ERR("%s:LCM gpio %d request failed, rc=%d\n", __func__,  FIGHTER_GPIO_LCD_RSTz, rc);
 			return -EINVAL;
 		}
+
 		dsi_power_on = true;
 	}
 
@@ -2214,6 +2514,7 @@ static int mipi_dsi_panel_power(int on)
 				return -ENODEV;
 			}
 		}
+
 		rc = regulator_enable(v_dsivdd);
 		if (rc) {
 			PR_DISP_ERR("enable regulator %s failed, rc=%d\n", dsivdd_str, rc);
@@ -2233,22 +2534,24 @@ static int mipi_dsi_panel_power(int on)
 			}
 		}
 
+		fighter_lcd_id_power(PM_GPIO_PULL_NO);
+
 		if (!mipi_lcd_on) {
 			if (isorise)
 				hr_msleep(1);
 			else
 				hr_msleep(10);
-			gpio_set_value(FIGHTER_LCD_RSTz, 1);
+			gpio_set_value(FIGHTER_GPIO_LCD_RSTz, 1);
 			if (isorise)
 				hr_msleep(10);
 			else
 				hr_msleep(5);
-			gpio_set_value(FIGHTER_LCD_RSTz, 0);
+			gpio_set_value(FIGHTER_GPIO_LCD_RSTz, 0);
 			if (isorise)
 				hr_msleep(10);
 			else
 				hr_msleep(30);
-			gpio_set_value(FIGHTER_LCD_RSTz, 1);
+			gpio_set_value(FIGHTER_GPIO_LCD_RSTz, 1);
 		}
 		if (isorise)
 			hr_msleep(10);
@@ -2260,9 +2563,11 @@ static int mipi_dsi_panel_power(int on)
 	} else {
 		PR_DISP_INFO("%s: off\n", __func__);
 		if (!bPanelPowerOn) return 0;
+		fighter_lcd_id_power(PM_GPIO_PULL_DN);
+		
 		if (isorise)
 			hr_msleep(120);
-		gpio_set_value(FIGHTER_LCD_RSTz, 0);
+		gpio_set_value(FIGHTER_GPIO_LCD_RSTz, 0);
 		if (isorise)
 			hr_msleep(120);
 		else
@@ -2279,6 +2584,7 @@ static int mipi_dsi_panel_power(int on)
 			}
 			hr_msleep(5);
 		}
+
 		if (regulator_disable(v_dsivdd)) {
 			PR_DISP_ERR("%s: Unable to enable the regulator: %s\n", __func__, dsivdd_str);
 			return -EINVAL;
@@ -2307,7 +2613,7 @@ static int mipi_dsi_panel_power(int on)
 }
 
 static struct mipi_dsi_platform_data mipi_dsi_pdata = {
-	.vsync_gpio = FIGHTER_LCD_TE,
+	.vsync_gpio = FIGHTER_GPIO_LCD_TE,
 	.dsi_power_save = mipi_dsi_panel_power,
 };
 
@@ -2328,6 +2634,8 @@ static int __init fighter_panel_late_init(void)
 	mipi_dsi_buf_alloc(&fighter_panel_rx_buf, DSI_BUF_SIZE);
 
 	mipi_cmd_novatek_blue_qhd_pt_init();
+
+	PR_DISP_INFO("%s: manufacture_id=%x\n", __func__, panel_type);
 
 	return platform_driver_register(&this_driver);
 }

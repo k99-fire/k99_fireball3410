@@ -263,6 +263,12 @@ config MACH_ELITE
 	help
 	  Support for the HTC Elite
 
+config MACH_FIGHTER
+	depends on ARCH_MSM8960
+	bool "Fighter"
+	help
+	  Support for the HTC Fighter
+
 config MACH_VILLE
 	depends on ARCH_MSM8960
 	bool "Ville"

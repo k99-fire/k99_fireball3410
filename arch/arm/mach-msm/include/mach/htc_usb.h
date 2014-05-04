@@ -1319,18 +1319,22 @@ static struct android_usb_product usb_products[] = {
 };
 
 #ifdef CONFIG_USB_GADGET_VERIZON_PRODUCT_ID
+/*
+ * Verizon: 0x0e05 ~ 0x0e72
+ *	Internet sharing(0)  and Internet pass through(1) both use rndis
+ */
 #ifdef CONFIG_MACH_VIGOR
 static int vigor_usb_product_id_match_array[] = {
-	0x0c93, 0x0e05, 
-	0x0ca8, 0x0e06, 
-	0x0fda, 0x0e07, 
-	0x0fdb, 0x0e08, 
-	0x0c07, 0x0e0b, 
-	0x0c08, 0x0e0c, 
-	0x0ff8, 0x0e0d, 
-	0x0fd5, 0x0e0e, 
-	0x0fd4, 0x0e0f, 
-	0x0ff9, 0x0e73, 
+	0x0c93, 0x0e05, /* mtp */ 
+	0x0ca8, 0x0e06, /* mtp + adb */ 
+	0x0fda, 0x0e07, /* ums + adb + 9k rmnet */ 
+	0x0fdb, 0x0e08, /* ums + 9k rmnet */ 
+	0x0c07, 0x0e0b, /* ums + adb + diag */ 
+	0x0c08, 0x0e0c, /* ums + diag */ 
+	0x0ff8, 0x0e0d, /* CDC-ECM */ 
+	0x0fd5, 0x0e0e, /* ums + diag + 9k diag + rmnet */ 
+	0x0fd4, 0x0e0f, /* ums + adb + diag + 9k diag + rmnet */ 
+	0x0ff9, 0x0e73, /* ums */ 
 	0x0fa4, 0x0e8f, 
 	0x0fa5, 0x0e90, 
 	0x0f99, 0x0e91, 
@@ -1343,17 +1347,17 @@ static int vigor_usb_product_id_match_array[] = {
 static int vigor_usb_product_id_rndis[] = {
 	0x0e09, 0x0e0a,
 };
-#endif 
+#endif /* CONFIG_MACH_VIGOR */
 
 #ifdef CONFIG_MACH_VIVOW
 static int vivow_usb_product_id_match_array[] = {
-	0x0c93, 0x0e10, 
-	0x0ca8, 0x0e11, 
-	0x0fda, 0x0e12, 
-	0x0fdb, 0x0e13, 
-	0x0c07, 0x0e16, 
-	0x0c08, 0x0e17, 
-	0x0ff8, 0x0e18, 
+	0x0c93, 0x0e10, /* mtp */ 
+	0x0ca8, 0x0e11, /* mtp + adb */ 
+	0x0fda, 0x0e12, /* ums + adb + 9k rmnet */ 
+	0x0fdb, 0x0e13, /* ums + 9k rmnet */ 
+	0x0c07, 0x0e16, /* ums + adb + diag */ 
+	0x0c08, 0x0e17, /* ums + diag */ 
+	0x0ff8, 0x0e18, /* CDC-ECM */ 
 	0x0ff9, 0x0e74, 
 	0x0fa4, 0x0e87, 
 	0x0fa5, 0x0e88, 
@@ -1365,20 +1369,20 @@ static int vivow_usb_product_id_match_array[] = {
 static int vivow_usb_product_id_rndis[] = {
 	0x0e14, 0x0e15,
 };
-#endif 
+#endif /* CONFIG_MACH_VIVOW */
 
 #ifdef CONFIG_MACH_MECHA
 static int mecha_usb_product_id_match_array[] = {
-	0x0c93, 0x0e1b, 
-	0x0ca8, 0x0e1c, 
-	0x0fda, 0x0e1d, 
-	0x0fdb, 0x0e1e, 
-	0x0c07, 0x0e21, 
-	0x0c08, 0x0e22, 
-	0x0ff8, 0x0e23, 
-	0x0fd5, 0x0e24, 
-	0x0fd4, 0x0e25, 
-	0x0ff9, 0x0e75, 
+	0x0c93, 0x0e1b, /* mtp */ 
+	0x0ca8, 0x0e1c, /* mtp + adb */ 
+	0x0fda, 0x0e1d, /* ums + adb + 9k rmnet */ 
+	0x0fdb, 0x0e1e, /* ums + 9k rmnet */ 
+	0x0c07, 0x0e21, /* ums + adb + diag */ 
+	0x0c08, 0x0e22, /* ums + diag */ 
+	0x0ff8, 0x0e23, /* CDC-ECM */ 
+	0x0fd5, 0x0e24, /* ums + diag + 9k diag + rmnet */ 
+	0x0fd4, 0x0e25, /* ums + adb + diag + 9k diag + rmnet */ 
+	0x0ff9, 0x0e75, /* ums */ 
 	0x0fa4, 0x0e95, 
 	0x0fa5, 0x0e96, 
 	0x0f99, 0x0e97, 
@@ -1391,17 +1395,17 @@ static int mecha_usb_product_id_match_array[] = {
 static int mecha_usb_product_id_rndis[] = {
 	0x0e1f, 0x0e20,
 };
-#endif 
+#endif /* CONFIG_MACH_MECHA */
 
 #ifdef CONFIG_MACH_BLISSC
 static int blissc_usb_product_id_match_array[] = {
-	0x0c93, 0x0e26, 
-	0x0ca8, 0x0e27, 
-	0x0fda, 0x0e28, 
-	0x0fdb, 0x0e29, 
-	0x0c07, 0x0e2c, 
-	0x0c08, 0x0e2d, 
-	0x0ff8, 0x0e2e, 
+	0x0c93, 0x0e26, /* mtp */ 
+	0x0ca8, 0x0e27, /* mtp + adb */ 
+	0x0fda, 0x0e28, /* ums + adb + 9k rmnet */ 
+	0x0fdb, 0x0e29, /* ums + 9k rmnet */
+	0x0c07, 0x0e2c, /* ums + adb + diag */
+	0x0c08, 0x0e2d, /* ums + diag */ 
+	0x0ff8, 0x0e2e, /* CDC-ECM */ 
 	0x0ff9, 0x0ccb, 
 	0x0ffc, 0x0e7d, 
 	0x0fa4, 0x0e9b, 
@@ -1414,7 +1418,7 @@ static int blissc_usb_product_id_match_array[] = {
 static int blissc_usb_product_id_rndis[] = {
 	0x0e2a, 0x0e2b,
 };
-#endif 
-#endif 
+#endif /* CONFIG_MACH_BLISSC */
+#endif /* CONFIG_USB_GADGET_VERIZON_PRODUCT_ID */
 
 #endif

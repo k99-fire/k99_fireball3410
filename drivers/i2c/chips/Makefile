@@ -17,13 +17,14 @@ obj-$(CONFIG_AMP_TFA9887L)	+= tfa9887l.o
 obj-$(CONFIG_AMP_TPA6185)       += tpa6185.o
 obj-$(CONFIG_INPUT_CAPELLA_CM3629)      += cm3629.o
 obj-$(CONFIG_SENSORS_AKM8975)   += akm8975.o
-obj-$(CONFIG_SENSORS_AKM8975_PANA_GYRO)   += akm8975_pana_gyro.o
+obj-$(CONFIG_SENSORS_AKM8975_PANA_GYRO) += akm8975_pana_gyro.o
 obj-$(CONFIG_SENSORS_PANASONIC_GYRO)	+= ewtzmu2.o
 obj-$(CONFIG_SENSORS_AK8963)    += akm8963.o
 obj-$(CONFIG_SENSORS_R3GD20)    += r3gd20.o
 obj-$(CONFIG_SENSORS_BMA250)	+= bma250.o
 obj-$(CONFIG_BOSCH_BMA250)      += bma250_bosch.o
 obj-$(CONFIG_VP_A1028)          += a1028.o
+obj-$(CONFIG_AMP_TPA2051D3)		+= tpa2051d3.o
 ifeq ($(CONFIG_I2C_DEBUG_CHIP),y)
 EXTRA_CFLAGS += -DDEBUG
 endif

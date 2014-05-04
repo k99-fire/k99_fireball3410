@@ -11,38 +11,28 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/platform_device.h>
 #include <linux/regulator/pm8xxx-regulator.h>
 #include <linux/regulator/msm-gpio-regulator.h>
 #include <mach/rpm-regulator.h>
 
-#include "board-fighter.h"
+#include "board-8960.h"
 
 #define VREG_CONSUMERS(_id) \
 	static struct regulator_consumer_supply vreg_consumers_##_id[]
 
-/*
- * Consumer specific regulator names:
- *			 regulator name		consumer dev_name
- */
 VREG_CONSUMERS(L1) = {
 	REGULATOR_SUPPLY("8921_l1",		NULL),
 };
 VREG_CONSUMERS(L2) = {
 	REGULATOR_SUPPLY("8921_l2",		NULL),
 	REGULATOR_SUPPLY("dsi_vdda",		"mipi_dsi.1"),
-	REGULATOR_SUPPLY("dsi_pll_vdda",	"mdp.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_camera_qs_mt9p017.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.1"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.2"),
+	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csid.0"),
+	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csid.1"),
+	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csid.2"),
 };
 VREG_CONSUMERS(L3) = {
 	REGULATOR_SUPPLY("8921_l3",		NULL),
 	REGULATOR_SUPPLY("HSUSB_3p3",		"msm_otg"),
-	REGULATOR_SUPPLY("switch_ldo3",		"cable_detect"),
 };
 VREG_CONSUMERS(L4) = {
 	REGULATOR_SUPPLY("8921_l4",		NULL),
@@ -77,9 +67,6 @@ VREG_CONSUMERS(L10) = {
 };
 VREG_CONSUMERS(L11) = {
 	REGULATOR_SUPPLY("8921_l11",		NULL),
-	REGULATOR_SUPPLY("cam_vana",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vana",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vana",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vana",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vana",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vana",		"4-0048"),
@@ -88,9 +75,6 @@ VREG_CONSUMERS(L11) = {
 };
 VREG_CONSUMERS(L12) = {
 	REGULATOR_SUPPLY("8921_l12",		NULL),
-	REGULATOR_SUPPLY("cam_vdig",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vdig",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vdig",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-0048"),
@@ -103,13 +87,9 @@ VREG_CONSUMERS(L14) = {
 };
 VREG_CONSUMERS(L15) = {
 	REGULATOR_SUPPLY("8921_l15",		NULL),
-	REGULATOR_SUPPLY("vreg_xoadc",		"pm8921-charger"),
 };
 VREG_CONSUMERS(L16) = {
 	REGULATOR_SUPPLY("8921_l16",		NULL),
-	REGULATOR_SUPPLY("cam_vaf",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vaf",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vaf",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-0048"),
@@ -131,7 +111,6 @@ VREG_CONSUMERS(L22) = {
 VREG_CONSUMERS(L23) = {
 	REGULATOR_SUPPLY("8921_l23",		NULL),
 	REGULATOR_SUPPLY("dsi_vddio",		"mipi_dsi.1"),
-	REGULATOR_SUPPLY("dsi_pll_vddio",	"mdp.0"),
 	REGULATOR_SUPPLY("hdmi_avdd",		"hdmi_msm.0"),
 	REGULATOR_SUPPLY("pll_vdd",		"pil_riva"),
 	REGULATOR_SUPPLY("pll_vdd",		"pil_qdsp6v4.1"),
@@ -198,12 +177,10 @@ VREG_CONSUMERS(S4) = {
 };
 VREG_CONSUMERS(S5) = {
 	REGULATOR_SUPPLY("8921_s5",		NULL),
-	//	REGULATOR_SUPPLY("krait0",		"acpuclk-8960"),
 	REGULATOR_SUPPLY("krait0",		NULL),
 };
 VREG_CONSUMERS(S6) = {
 	REGULATOR_SUPPLY("8921_s6",		NULL),
-	//	REGULATOR_SUPPLY("krait1",		"acpuclk-8960"),
 	REGULATOR_SUPPLY("krait1",		NULL),
 };
 VREG_CONSUMERS(S7) = {
@@ -214,7 +191,6 @@ VREG_CONSUMERS(S8) = {
 };
 VREG_CONSUMERS(LVS1) = {
 	REGULATOR_SUPPLY("8921_lvs1",		NULL),
-	REGULATOR_SUPPLY("sdc_vdd",		"msm_sdcc.4"),
 	REGULATOR_SUPPLY("iris_vddio",		"wcnss_wlan.0"),
 };
 VREG_CONSUMERS(LVS2) = {
@@ -231,9 +207,6 @@ VREG_CONSUMERS(LVS4) = {
 };
 VREG_CONSUMERS(LVS5) = {
 	REGULATOR_SUPPLY("8921_lvs5",		NULL),
-	REGULATOR_SUPPLY("cam_vio",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vio",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vio",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vio",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vio",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vio",		"4-0048"),
@@ -249,7 +222,6 @@ VREG_CONSUMERS(LVS7) = {
 };
 VREG_CONSUMERS(USB_OTG) = {
 	REGULATOR_SUPPLY("8921_usb_otg",	NULL),
-	REGULATOR_SUPPLY("vbus_otg",		"msm_otg"),
 };
 VREG_CONSUMERS(HDMI_MVS) = {
 	REGULATOR_SUPPLY("8921_hdmi_mvs",	NULL),
@@ -351,7 +323,6 @@ VREG_CONSUMERS(EXT_OTG_SW) = {
 		REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_STATUS, 0, 0, \
 		_always_on, _supply_regulator, 0, _enable_time, _reg_id)
 
-/* Pin control initialization */
 #define PM8XXX_PC(_id, _name, _always_on, _pin_fn, _pin_ctrl, \
 		  _supply_regulator, _reg_id) \
 	{ \
@@ -478,7 +449,6 @@ VREG_CONSUMERS(EXT_OTG_SW) = {
 		 RPM_VREG_STATE_OFF, _sleep_selectable, _always_on, \
 		 _supply_regulator, 0)
 
-/* Pin control initialization */
 #define RPM_PC_INIT(_id, _always_on, _pin_fn, _pin_ctrl, _supply_regulator) \
 	{ \
 		.init_data = { \
@@ -496,7 +466,6 @@ VREG_CONSUMERS(EXT_OTG_SW) = {
 		.pin_ctrl = _pin_ctrl, \
 	}
 
-/* GPIO regulator constraints */
 struct gpio_regulator_platform_data msm_gpio_regulator_pdata[] __devinitdata = {
 	
 	GPIO_VREG(EXT_5V, "ext_5v", "ext_5v_en", PM8921_MPP_PM_TO_SYS(7), NULL),
@@ -523,15 +492,6 @@ struct platform_device msm8960_device_ext_l2_vreg __devinitdata = {
         },
 };
 
-struct platform_device msm8960_device_ext_3p3v_vreg __devinitdata = {
-	.name	= GPIO_REGULATOR_DEV_NAME,
-	.id	= PM8921_GPIO_PM_TO_SYS(17),
-	.dev	= {
-		.platform_data =
-			&msm_gpio_regulator_pdata[GPIO_VREG_ID_EXT_3P3V],
-	},
-};
-
 struct platform_device msm8960_device_rpm_regulator __devinitdata = {
         .name   = "rpm-regulator",
         .id     = -1,
@@ -540,20 +500,14 @@ struct platform_device msm8960_device_rpm_regulator __devinitdata = {
         },
 };
 
-/* SAW regulator constraints */
 struct regulator_init_data msm_saw_regulator_pdata_s5 =
-	/*	      ID  vreg_name	       min_uV   max_uV */
+	
 	SAW_VREG_INIT(S5, "8921_s5",	       850000, 1300000);
 struct regulator_init_data msm_saw_regulator_pdata_s6 =
 	SAW_VREG_INIT(S6, "8921_s6",	       850000, 1300000);
 
-/* PM8921 regulator constraints */
 struct pm8xxx_regulator_platform_data
 msm_pm8921_regulator_pdata[] __devinitdata = {
-	/*
-	 *		ID   name always_on pd min_uV   max_uV   en_t supply
-	 *	system_uA reg_ID
-	 */
 	PM8XXX_NLDO1200(L26, "8921_l26", 0, 1, 375000, 1050000, 200, "8921_s7",
 		0, 1),
 	PM8XXX_NLDO1200(L27, "8921_l27", 0, 1, 375000, 1050000, 200, "8921_s7",
@@ -563,14 +517,14 @@ msm_pm8921_regulator_pdata[] __devinitdata = {
 	PM8XXX_LDO(L29,      "8921_l29", 0, 1, 1800000, 1800000, 200, "8921_s8",
 		0, 4),
 
-	/*	     ID        name      always_on pd en_t supply    reg_ID */
-	PM8XXX_VS300(USB_OTG,  "8921_usb_otg",  0, 1, 0,   "ext_5v", 5),
+	
+	PM8XXX_VS300(USB_OTG,  "8921_usb_otg",  0, 0, 0,   "ext_5v", 5),
 	PM8XXX_VS300(HDMI_MVS, "8921_hdmi_mvs", 0, 1, 0,   "ext_5v", 6),
 };
 
 static struct rpm_regulator_init_data
 msm_rpm_regulator_init_data[] __devinitdata = {
-	/*	 ID    a_on pd ss min_uV   max_uV  supply sys_uA freq */
+	
 	RPM_SMPS(S1, 1, 1, 0, 1225000, 1225000, NULL, 100000, 3p20, NONE, NONE),
 	RPM_SMPS(S2, 0, 1, 0, 1300000, 1300000, NULL,      0, 1p60, NONE, NONE),
 	RPM_SMPS(S3, 0, 1, 1,  500000, 1150000, NULL, 100000, 4p80, NONE, NONE),
@@ -578,7 +532,7 @@ msm_rpm_regulator_init_data[] __devinitdata = {
 	RPM_SMPS(S7, 0, 1, 0, 1150000, 1150000, NULL, 100000, 3p20, NONE, NONE),
 	RPM_SMPS(S8, 1, 1, 1, 2050000, 2050000, NULL, 100000, 1p60, NONE, NONE),
 
-	/*	ID     a_on pd ss min_uV   max_uV  supply  sys_uA init_ip */
+	
 	RPM_LDO(L1,	 1, 1, 0, 1050000, 1050000, "8921_s4", 0, 10000),
 	RPM_LDO(L2,	 0, 1, 0, 1200000, 1200000, "8921_s4", 0, 0),
 	RPM_LDO(L3,	 0, 1, 0, 3075000, 3075000, NULL,      0, 0),
@@ -602,7 +556,7 @@ msm_rpm_regulator_init_data[] __devinitdata = {
 	RPM_LDO(L24,	 0, 1, 1,  750000, 1150000, "8921_s1", 10000, 10000),
 	RPM_LDO(L25,	 1, 1, 0, 1225000, 1225000, "8921_s1", 10000, 10000),
 
-	/*	ID     a_on pd ss		    supply */
+	
 	RPM_VS(LVS1,	 0, 1, 0,		    "8921_s4"),
 	RPM_VS(LVS2,	 0, 1, 0,		    "8921_s1"),
 	RPM_VS(LVS3,	 0, 1, 0,		    "8921_s4"),
@@ -611,34 +565,12 @@ msm_rpm_regulator_init_data[] __devinitdata = {
 	RPM_VS(LVS6,	 0, 1, 0,		    "8921_s4"),
 	RPM_VS(LVS7,	 0, 1, 0,		    "8921_s4"),
 
-	/*	 ID      a_on  ss min_uV   max_uV   supply        freq */
+	
 	RPM_NCP(NCP,	 0,    0, 1800000, 1800000, "8921_l6",    1p60),
 };
 
 int msm_pm8921_regulator_pdata_len __devinitdata =
 	ARRAY_SIZE(msm_pm8921_regulator_pdata);
-
-#define RPM_REG_MAP(_id, _sleep_also, _voter, _supply, _dev_name) \
-	{ \
-		.vreg_id = RPM_VREG_ID_PM8921_##_id, \
-		.sleep_also = _sleep_also, \
-		.voter = _voter, \
-		.supply = _supply, \
-		.dev_name = _dev_name, \
-	}
-static struct rpm_regulator_consumer_mapping
-	      msm_rpm_regulator_consumer_mapping[] __devinitdata = {
-	RPM_REG_MAP(L23, 0, 1, "krait0_l23", "acpuclk-8960"),
-	RPM_REG_MAP(L23, 0, 2, "krait1_l23", "acpuclk-8960"),
-	RPM_REG_MAP(L23, 0, 6, "l2_l23",     "acpuclk-8960"),
-	RPM_REG_MAP(L24, 0, 1, "krait0_mem", "acpuclk-8960"),
-	RPM_REG_MAP(L24, 0, 2, "krait1_mem", "acpuclk-8960"),
-	RPM_REG_MAP(S3,  0, 1, "krait0_dig", "acpuclk-8960"),
-	RPM_REG_MAP(S3,  0, 2, "krait1_dig", "acpuclk-8960"),
-	RPM_REG_MAP(S8,  0, 1, "krait0_s8",  "acpuclk-8960"),
-	RPM_REG_MAP(S8,  0, 2, "krait1_s8",  "acpuclk-8960"),
-	RPM_REG_MAP(S8,  0, 6, "l2_s8",      "acpuclk-8960"),
-};
 
 struct rpm_regulator_platform_data msm_rpm_regulator_pdata __devinitdata = {
 	.init_data		= msm_rpm_regulator_init_data,
@@ -646,6 +578,4 @@ struct rpm_regulator_platform_data msm_rpm_regulator_pdata __devinitdata = {
 	.version		= RPM_VREG_VERSION_8960,
 	.vreg_id_vdd_mem	= RPM_VREG_ID_PM8921_L24,
 	.vreg_id_vdd_dig	= RPM_VREG_ID_PM8921_S3,
-	.consumer_map		= msm_rpm_regulator_consumer_mapping,
-	.consumer_map_len = ARRAY_SIZE(msm_rpm_regulator_consumer_mapping),
 };

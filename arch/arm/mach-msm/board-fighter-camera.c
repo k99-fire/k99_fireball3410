@@ -39,71 +39,6 @@ static struct platform_device msm_camera_server = {
 	.id = 0,
 };
 
-static struct gpiomux_setting cam_settings[5] = {
-	{
-		.func = GPIOMUX_FUNC_GPIO, /*suspend*/
-		.drv = GPIOMUX_DRV_8MA,
-		.pull = GPIOMUX_PULL_DOWN,
-		.dir = GPIOMUX_IN,
-	},
-
-	{
-		.func = GPIOMUX_FUNC_1, /*active 1*/
-		.drv = GPIOMUX_DRV_8MA,
-		.pull = GPIOMUX_PULL_NONE,
-	},
-
-	{
-		.func = GPIOMUX_FUNC_GPIO, /*active 2*/
-		.drv = GPIOMUX_DRV_8MA,
-		.pull = GPIOMUX_PULL_NONE,
-		.dir = GPIOMUX_OUT_LOW,
-	},
-
-	{
-		.func = GPIOMUX_FUNC_1, /*active 3*/
-		.drv = GPIOMUX_DRV_8MA,
-		.pull = GPIOMUX_PULL_NONE,
-	},
-
-	{
-		.func = GPIOMUX_FUNC_2, /*active 4*/
-		.drv = GPIOMUX_DRV_8MA,
-		.pull = GPIOMUX_PULL_NONE,
-	},
-};
-
-static struct msm_gpiomux_config fighter_cam_configs[] = {
-	{
-		.gpio = FIGHTER_CAM_MCLK1,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[4],
-			[GPIOMUX_SUSPENDED] = &cam_settings[2],
-		},
-	},
-	{
-		.gpio = FIGHTER_CAM_MCLK0,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[1],
-			[GPIOMUX_SUSPENDED] = &cam_settings[2],
-		},
-	},
-	{
-		.gpio = FIGHTER_CAM_I2C_SDA,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[3],
-			[GPIOMUX_SUSPENDED] = &cam_settings[0],
-		},
-	},
-	{
-		.gpio = FIGHTER_CAM_I2C_SCL,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[3],
-			[GPIOMUX_SUSPENDED] = &cam_settings[0],
-		},
-	},
-};
-
 static struct msm_bus_vectors cam_init_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
@@ -249,6 +184,7 @@ struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 		.camera_csi_on = fighter_csi_vreg_on,
 		.camera_csi_off = fighter_csi_vreg_off,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
+		.csid_core = 0,
 		.is_csiphy = 1,
 		.is_csid   = 1,
 		.is_ispif  = 1,
@@ -261,6 +197,7 @@ struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 		.camera_csi_on = fighter_csi_vreg_on,
 		.camera_csi_off = fighter_csi_vreg_off,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
+		.csid_core = 1,
 		.is_csiphy = 1,
 		.is_csid   = 1,
 		.is_ispif  = 1,
@@ -274,6 +211,7 @@ struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 
 int fighter_flashlight_control(int mode)
 {
+pr_info("%s, linear led, mode=%d", __func__, mode);
 #ifdef CONFIG_FLASHLIGHT_TPS61310
 	return tps61310_flashlight_control(mode);
 #else
@@ -294,11 +232,11 @@ static struct regulator *reg_8921_l12;
 static struct regulator *reg_8921_lvs6;
 
 static uint16_t msm_cam_gpio_tbl[] = {
-	FIGHTER_CAM_MCLK0, /*CAMIF_MCLK*/
-	FIGHTER_CAM_MCLK1,
+	FIGHTER_GPIO_CAM_MCLK0, /*CAMIF_MCLK*/
+	FIGHTER_GPIO_CAM_MCLK1,
 #if 0
-	FIGHTER_CAM_I2C_DAT, /*CAMIF_I2C_DATA*/
-	FIGHTER_CAM_I2C_CLK, /*CAMIF_I2C_CLK*/
+	FIGHTER_GPIO_CAM_I2C_DAT, /*CAMIF_I2C_DATA*/
+	FIGHTER_GPIO_CAM_I2C_CLK, /*CAMIF_I2C_CLK*/
 #endif
 };
 
@@ -390,6 +328,7 @@ static int fighter_s5k3h2yx_vreg_on(void)
 		pr_err("[CAM] sensor_power_enable(\"8921_l9\", 2.8V) FAILED %d\n", rc);
 		goto enable_vcm_fail;
 	}
+	mdelay(1);
 
 	/* IO */
 	rc = camera_sensor_power_enable("8921_lvs6", 1800000, &reg_8921_lvs6);
@@ -409,13 +348,13 @@ static int fighter_s5k3h2yx_vreg_on(void)
 
 	/* digital */
 	if (system_rev >= 2) {	/* fighter use LDO by GPIO95 on XC */
-		rc = gpio_request(FIGHTER_CAM_EXT_LDO, "CAM_EXT_LDO");
+		rc = gpio_request(FIGHTER_GPIO_CAM_EXT_LDO, "CAM_EXT_LDO");
 		if (rc < 0)
 			pr_err("[CAM] %s: gpio %d request failed, rc=%d\n", __func__,
-				FIGHTER_CAM_EXT_LDO, rc);
+				FIGHTER_GPIO_CAM_EXT_LDO, rc);
 		else {
-			gpio_direction_output(FIGHTER_CAM_EXT_LDO, 1);
-			gpio_free(FIGHTER_CAM_EXT_LDO);
+			gpio_direction_output(FIGHTER_GPIO_CAM_EXT_LDO, 1);
+			gpio_free(FIGHTER_GPIO_CAM_EXT_LDO);
 		}
 	}
 	else
@@ -450,13 +389,13 @@ static int fighter_s5k3h2yx_vreg_off(void)
 
 	/* digital */
 	if (system_rev >= 2) {	/* fighter use LDO by GPIO95 on XC */
-		rc = gpio_request(FIGHTER_CAM_EXT_LDO, "CAM_EXT_LDO");
+		rc = gpio_request(FIGHTER_GPIO_CAM_EXT_LDO, "CAM_EXT_LDO");
 		if (rc < 0)
 			pr_err("[CAM] %s: gpio %d request failed, rc=%d\n", __func__,
-				FIGHTER_CAM_EXT_LDO, rc);
+				FIGHTER_GPIO_CAM_EXT_LDO, rc);
 		else {
-			gpio_direction_output(FIGHTER_CAM_EXT_LDO, 0);
-			gpio_free(FIGHTER_CAM_EXT_LDO);
+			gpio_direction_output(FIGHTER_GPIO_CAM_EXT_LDO, 0);
+			gpio_free(FIGHTER_GPIO_CAM_EXT_LDO);
 		}
 	}
 	else
@@ -487,7 +426,7 @@ static struct i2c_board_info s5k3h2yx_actuator_i2c_info = {
 static struct msm_actuator_info s5k3h2yx_actuator_info = {
 	.board_info     = &s5k3h2yx_actuator_i2c_info,
 	.bus_id         = MSM_8960_GSBI4_QUP_I2C_BUS_ID,
-	.vcm_pwd        = FIGHTER_CAM_VCM_PD,
+	.vcm_pwd        = FIGHTER_GPIO_CAM_VCM_PD,
 	.vcm_enable     = 1,
 };
 #endif
@@ -502,8 +441,8 @@ static struct msm_camera_sensor_platform_info sensor_s5k3h2yx_board_info = {
 	.mirror_flip = CAMERA_SENSOR_MIRROR_FLIP,
 	.sensor_reset_enable = 0,
 	.sensor_reset	= 0,
-	.sensor_pwd	= FIGHTER_CAM_PWDN,
-	.vcm_pwd	= FIGHTER_CAM_VCM_PD,
+	.sensor_pwd	= FIGHTER_GPIO_CAM_PWDN,
+	.vcm_pwd	= FIGHTER_GPIO_CAM_VCM_PD,
 	.vcm_enable	= 1,
 	.csi_lane_params = &s5k3h2yx_csi_lane_params,
 };
@@ -635,7 +574,7 @@ static struct camera_led_est msm_camera_sensor_s5k3h2yx_led_table[] = {
 static struct camera_led_info msm_camera_sensor_s5k3h2yx_led_info = {
 	.enable = 1,
 	.low_limit_led_state = FL_MODE_TORCH,
-	.max_led_current_ma = 800,
+	.max_led_current_ma = 750,
 	.num_led_est_table = ARRAY_SIZE(msm_camera_sensor_s5k3h2yx_led_table),
 };
 
@@ -696,6 +635,7 @@ static int fighter_imx105_vreg_on(void)
 		pr_err("sensor_power_enable(\"8921_l9\", 2.8V) FAILED %d\n", rc);
 		goto enable_vcm_fail;
 	}
+	mdelay(1);
 
 	pr_info("imx105 VCM on\n");
 
@@ -714,19 +654,20 @@ static int fighter_imx105_vreg_on(void)
 	/* digital */
 	if (system_rev >= 2) {	/* fighter use LDO by GPIO95 on XC */
 		pr_err("system_rev >=2:vreg on");
-		rc = gpio_request(FIGHTER_CAM_EXT_LDO, "CAM_EXT_LDO");
+		rc = gpio_request(FIGHTER_GPIO_CAM_EXT_LDO, "CAM_EXT_LDO");
 		if (rc < 0)
 			pr_err(" %s: gpio %d request failed, rc=%d\n", __func__,
-					FIGHTER_CAM_EXT_LDO, rc);
+					FIGHTER_GPIO_CAM_EXT_LDO, rc);
 		else {
-			gpio_direction_output(FIGHTER_CAM_EXT_LDO, 1);
-			gpio_free(FIGHTER_CAM_EXT_LDO);
+			gpio_direction_output(FIGHTER_GPIO_CAM_EXT_LDO, 1);
+			gpio_free(FIGHTER_GPIO_CAM_EXT_LDO);
 		}
 	}
 	else{
 		pr_err("system_rev <2:vreg on");
 		rc = camera_sensor_power_enable("8921_l12", 1260000, &reg_8921_l12);/*Tom 20120224 increase to 1.26v for 876MHz*/
 	}
+	mdelay(1);
 
 	if (rc < 0) {
 		pr_err("sensor_power_enable(\"8921_l12\", 1.2V) FAILED %d\n", rc);
@@ -771,13 +712,13 @@ static int fighter_imx105_vreg_off(void)
 	/* digital */
 	if (system_rev >= 2) {	/* fighter use LDO by GPIO95 on XC */
 		pr_err("system_rev >=2:vreg off");
-		rc = gpio_request(FIGHTER_CAM_EXT_LDO, "CAM_EXT_LDO");
+		rc = gpio_request(FIGHTER_GPIO_CAM_EXT_LDO, "CAM_EXT_LDO");
 		if (rc < 0)
 			pr_err("%s: gpio %d request failed, rc=%d\n", __func__,
-					FIGHTER_CAM_EXT_LDO, rc);
+					FIGHTER_GPIO_CAM_EXT_LDO, rc);
 		else {
-			gpio_direction_output(FIGHTER_CAM_EXT_LDO, 0);
-			gpio_free(FIGHTER_CAM_EXT_LDO);
+			gpio_direction_output(FIGHTER_GPIO_CAM_EXT_LDO, 0);
+			gpio_free(FIGHTER_GPIO_CAM_EXT_LDO);
 		}
 	}
 	else{
@@ -813,7 +754,7 @@ static struct i2c_board_info imx105_actuator_i2c_info = {
 static struct msm_actuator_info imx105_actuator_info = {
 	.board_info     = &imx105_actuator_i2c_info,
 	.bus_id         = MSM_8960_GSBI4_QUP_I2C_BUS_ID,
-	.vcm_pwd        = FIGHTER_CAM_VCM_PD,
+	.vcm_pwd        = FIGHTER_GPIO_CAM_VCM_PD,
 	.vcm_enable     = 1,
 };
 #endif
@@ -828,8 +769,8 @@ static struct msm_camera_sensor_platform_info sensor_imx105_board_info = {
 	.mirror_flip = CAMERA_SENSOR_NONE,
 	.sensor_reset_enable = 0,
 	.sensor_reset	= 0,
-	.sensor_pwd	= FIGHTER_CAM_PWDN,
-	.vcm_pwd	= FIGHTER_CAM_VCM_PD,
+	.sensor_pwd	= FIGHTER_GPIO_CAM_PWDN,
+	.vcm_pwd	= FIGHTER_GPIO_CAM_VCM_PD,
 	.vcm_enable	= 1,
 	.csi_lane_params = &imx105_csi_lane_params,
 };
@@ -855,8 +796,8 @@ static struct camera_led_est msm_camera_sensor_imx105_led_table[] = {
 	{
 		.enable = 0,
 		.led_state = FL_MODE_FLASH,
-		.current_ma = 800,
-		.lumen_value = 800,
+		.current_ma = 750,
+		.lumen_value = 750,
 		.min_step = 33,
 		.max_step = 42
 	},
@@ -871,8 +812,8 @@ static struct camera_led_est msm_camera_sensor_imx105_led_table[] = {
 	{
 		.enable = 0,
 		.led_state = FL_MODE_FLASH,
-		.current_ma = 800,
-		.lumen_value = 800,
+		.current_ma = 750,
+		.lumen_value = 750,
 		.min_step = 40,
 		.max_step = 52
 	},
@@ -889,7 +830,7 @@ static struct camera_led_est msm_camera_sensor_imx105_led_table[] = {
 static struct camera_led_info msm_camera_sensor_imx105_led_info = {
 	.enable = 1,
 	.low_limit_led_state = FL_MODE_TORCH,
-	.max_led_current_ma = 800,
+	.max_led_current_ma = 750,
 	.num_led_est_table = ARRAY_SIZE(msm_camera_sensor_imx105_led_table),
 };
 
@@ -943,29 +884,30 @@ struct platform_device fighter_camera_sensor_imx105 = {
 static int fighter_mt9v113_vreg_on(void)
 {
 	int rc;
+	pr_info("%s\n", __func__);
 
 	pr_info("[CAM] %s\n", __func__);
 
 	/* IO */
-	rc = gpio_request(FIGHTER_V_CAM2_D1V8_EN, "CAM_D1V8_EN");
-	pr_info("[CAM] fighter_mt9v113_vreg_on %d 1v8\n", FIGHTER_V_CAM2_D1V8_EN);
+	rc = gpio_request(FIGHTER_GPIO_V_CAM2_D1V8_EN, "CAM_D1V8_EN");
+	pr_info("[CAM] fighter_mt9v113_vreg_on %d 1v8\n", FIGHTER_GPIO_V_CAM2_D1V8_EN);
 	if (rc) {
-		pr_err("[CAM] %s:GPIO_CAM_D1V8_EN gpio %d request failed, rc=%d\n", __func__,  FIGHTER_V_CAM2_D1V8_EN, rc);
+		pr_err("[CAM] %s:GPIO_CAM_D1V8_EN gpio %d request failed, rc=%d\n", __func__,  FIGHTER_GPIO_V_CAM2_D1V8_EN, rc);
 		goto init_fail;
 	}
-	gpio_direction_output(FIGHTER_V_CAM2_D1V8_EN, 1);
-	gpio_free(FIGHTER_V_CAM2_D1V8_EN);
+	gpio_direction_output(FIGHTER_GPIO_V_CAM2_D1V8_EN, 1);
+	gpio_free(FIGHTER_GPIO_V_CAM2_D1V8_EN);
 
 	udelay(50);
 
 	/* Reset */
-	rc = gpio_request(FIGHTER_CAM2_RSTz, "mt9v113");
+	rc = gpio_request(FIGHTER_GPIO_CAM2_RSTz, "mt9v113");
 	if (!rc) {
-		gpio_direction_output(FIGHTER_CAM2_RSTz, 1);
+		gpio_direction_output(FIGHTER_GPIO_CAM2_RSTz, 1);
 		msleep(2);
 	}	else
-		pr_err("[CAM] %s:FIGHTER_CAM2_RSTz gpio %d request failed, rc=%d\n", __func__,  FIGHTER_CAM2_RSTz, rc);
-	gpio_free(FIGHTER_CAM2_RSTz);
+		pr_err("[CAM] %s:FIGHTER_GPIO_CAM2_RSTz gpio %d request failed, rc=%d\n", __func__,  FIGHTER_GPIO_CAM2_RSTz, rc);
+	gpio_free(FIGHTER_GPIO_CAM2_RSTz);
 
 	udelay(50);
 
@@ -994,6 +936,7 @@ init_fail:
 static int fighter_mt9v113_vreg_off(void)
 {
 	int rc;
+	pr_info("%s\n", __func__);
 
 	pr_info("[CAM] %s\n", __func__);
 
@@ -1016,25 +959,25 @@ static int fighter_mt9v113_vreg_off(void)
 	udelay(50);
 
 	/* IO */
-	rc = gpio_request(FIGHTER_V_CAM2_D1V8_EN, "CAM_D1V8_EN");
-	pr_info("[CAM] fighter_mt9v113_vreg_off %d 1v8\n", FIGHTER_V_CAM2_D1V8_EN);
+	rc = gpio_request(FIGHTER_GPIO_V_CAM2_D1V8_EN, "CAM_D1V8_EN");
+	pr_info("[CAM] fighter_mt9v113_vreg_off %d 1v8\n", FIGHTER_GPIO_V_CAM2_D1V8_EN);
 	if (rc) {
-		pr_err("[CAM] %s:GPIO_CAM_D1V8_EN gpio %d request failed, rc=%d\n", __func__,  FIGHTER_V_CAM2_D1V8_EN, rc);
+		pr_err("[CAM] %s:GPIO_CAM_D1V8_EN gpio %d request failed, rc=%d\n", __func__,  FIGHTER_GPIO_V_CAM2_D1V8_EN, rc);
 		goto init_fail;
 	}
-	gpio_direction_output(FIGHTER_V_CAM2_D1V8_EN, 0);
-	gpio_free(FIGHTER_V_CAM2_D1V8_EN);
+	gpio_direction_output(FIGHTER_GPIO_V_CAM2_D1V8_EN, 0);
+	gpio_free(FIGHTER_GPIO_V_CAM2_D1V8_EN);
 
 	udelay(50);
 
 	/* Reset */
-	rc = gpio_request(FIGHTER_CAM2_RSTz, "mt9v113");
+	rc = gpio_request(FIGHTER_GPIO_CAM2_RSTz, "mt9v113");
 	if (!rc) {
-		gpio_direction_output(FIGHTER_CAM2_RSTz, 0);
+		gpio_direction_output(FIGHTER_GPIO_CAM2_RSTz, 0);
 		msleep(2);
 	} else
-		pr_err("[CAM] %s:FIGHTER_CAM2_RSTz gpio %d request failed, rc=%d\n", __func__,	FIGHTER_CAM2_RSTz, rc);
-	gpio_free(FIGHTER_CAM2_RSTz);
+		pr_err("[CAM] %s:FIGHTER_GPIO_CAM2_RSTz gpio %d request failed, rc=%d\n", __func__,	FIGHTER_GPIO_CAM2_RSTz, rc);
+	gpio_free(FIGHTER_GPIO_CAM2_RSTz);
 
 	udelay(50);
 
@@ -1051,8 +994,8 @@ static struct msm_camera_sensor_platform_info sensor_mt9v113_board_info = {
 	.mount_angle = 270,
 	.mirror_flip = CAMERA_SENSOR_NONE,
 	.sensor_reset_enable = 1,
-	.sensor_reset	= FIGHTER_CAM2_RSTz,
-	.sensor_pwd	= FIGHTER_CAM_PWDN,
+	.sensor_reset	= FIGHTER_GPIO_CAM2_RSTz,
+	.sensor_pwd	= FIGHTER_GPIO_CAM_PWDN,
 	.vcm_pwd	= 0,
 	.vcm_enable	= 1,
 	.csi_lane_params = &mt9v113_csi_lane_params,
@@ -1064,8 +1007,8 @@ static struct msm_camera_sensor_flash_data flash_mt9v113 = {
 
 static struct msm_camera_sensor_info msm_camera_sensor_mt9v113_data = {
 	.sensor_name	= "mt9v113",
-	.sensor_reset	= FIGHTER_CAM2_RSTz,
-	.sensor_pwd	= FIGHTER_CAM_PWDN,
+	.sensor_reset	= FIGHTER_GPIO_CAM2_RSTz,
+	.sensor_pwd	= FIGHTER_GPIO_CAM_PWDN,
 	.vcm_pwd	= 0,
 	.vcm_enable	= 1,
 	.camera_power_on = fighter_mt9v113_vreg_on,
@@ -1087,7 +1030,24 @@ struct platform_device fighter_camera_sensor_mt9v113 = {
 };
 #endif /* CONFIG_MT9V113 */
 
-struct i2c_board_info fighter_camera_i2c_boardinfo[] = {
+static void config_cam_id(int status)
+{
+	static uint32_t cam_id_gpio_start[] = {
+		GPIO_CFG(FIGHTER_GPIO_MAIN_CAM_ID, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
+	};
+
+	static uint32_t cam_id_gpio_end[] = {
+		GPIO_CFG(FIGHTER_GPIO_MAIN_CAM_ID, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	};
+	pr_info("config_cam_id(): status=%d\n",status);
+	if(status)
+		gpio_tlmm_config(cam_id_gpio_start[0], GPIO_CFG_ENABLE);
+	else
+		gpio_tlmm_config(cam_id_gpio_end[0], GPIO_CFG_ENABLE);
+}
+
+#ifdef CONFIG_I2C
+struct i2c_board_info msm_camera_boardinfo[] = {
 #ifdef CONFIG_S5K3H2YX
 	{
 		I2C_BOARD_INFO("s5k3h2yx", 0x20 >> 1),
@@ -1111,16 +1071,24 @@ struct i2c_board_info fighter_camera_i2c_boardinfo[] = {
 };
 
 struct msm_camera_board_info fighter_camera_board_info = {
-	.board_info = fighter_camera_i2c_boardinfo,
-	.num_i2c_board_info = ARRAY_SIZE(fighter_camera_i2c_boardinfo),
+	.board_info = msm_camera_boardinfo,
+	.num_i2c_board_info = ARRAY_SIZE(msm_camera_boardinfo),
 };
+#endif 
 #endif /* CONFIG_MSM_CAMERA */
 
-void __init fighter_init_camera(void)
+void __init msm8960_init_cam(void)
 {
-#ifdef CONFIG_MSM_CAMERA
-	msm_gpiomux_install(fighter_cam_configs,
-			ARRAY_SIZE(fighter_cam_configs));
+	pr_info("%s", __func__);
+
+	config_cam_id(1); 
+	msleep(2);
+
+	i2c_register_board_info(MSM_8960_GSBI4_QUP_I2C_BUS_ID,
+		fighter_camera_board_info.board_info,
+		fighter_camera_board_info.num_i2c_board_info);
+
+	config_cam_id(0); 
 
 	platform_device_register(&msm_camera_server);
 	platform_device_register(&msm8960_device_i2c_mux_gsbi4);
@@ -1131,5 +1099,4 @@ void __init fighter_init_camera(void)
 	platform_device_register(&msm8960_device_ispif);
 	platform_device_register(&msm8960_device_vfe);
 	platform_device_register(&msm8960_device_vpe);
-#endif /* CONFIG_MSM_CAMERA */
 }

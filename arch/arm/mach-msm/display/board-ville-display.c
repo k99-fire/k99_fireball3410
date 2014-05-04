@@ -30,14 +30,16 @@
 
 #include "../devices.h"
 #include "../board-8960.h"
-#include "../board-fighter.h"
+#include "../board-elite.h"
 
 #define MDP_VSYNC_GPIO 0
 
 #define MIPI_CMD_NOVATEK_QHD_PANEL_NAME        "mipi_cmd_novatek_qhd"
 #define MIPI_VIDEO_NOVATEK_QHD_PANEL_NAME      "mipi_video_novatek_qhd"
 #define MIPI_VIDEO_TOSHIBA_WSVGA_PANEL_NAME    "mipi_video_toshiba_wsvga"
+#define MIPI_VIDEO_TOSHIBA_WUXGA_PANEL_NAME    "mipi_video_toshiba_wuxga"
 #define MIPI_VIDEO_CHIMEI_WXGA_PANEL_NAME      "mipi_video_chimei_wxga"
+#define MIPI_VIDEO_CHIMEI_WUXGA_PANEL_NAME     "mipi_video_chimei_wuxga"
 #define MIPI_VIDEO_SIMULATOR_VGA_PANEL_NAME    "mipi_video_simulator_vga"
 #define MIPI_CMD_RENESAS_FWVGA_PANEL_NAME      "mipi_cmd_renesas_fwvga"
 #define MIPI_VIDEO_ORISE_720P_PANEL_NAME       "mipi_video_orise_720p"
@@ -55,7 +57,6 @@
       
 #endif
 #define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE, 4096)
-
 #ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 #define MSM_FB_OVERLAY0_WRITEBACK_SIZE \
       roundup((roundup(1920, 32) * roundup(1200, 32) * 3 * 2), 4096)
@@ -64,14 +65,12 @@
 #endif  
 #ifdef CONFIG_FB_MSM_OVERLAY1_WRITEBACK
 #define MSM_FB_OVERLAY1_WRITEBACK_SIZE \
-      roundup((roundup(1920, 32) * roundup(1200, 32) * 3 * 2), 4096)
+      roundup((roundup(1920, 32) * roundup(1080, 32) * 3 * 2), 4096)
 #else
 #define MSM_FB_OVERLAY1_WRITEBACK_SIZE (0)
 #endif  
 
-#define MDP_VSYNC_GPIO 0
-
-static int fighter_detect_panel(const char *name)
+static int ville_detect_panel(const char *name)
 {
 	if (!strncmp(name, HDMI_PANEL_NAME,
 		strnlen(HDMI_PANEL_NAME,
@@ -107,7 +106,7 @@ static struct msm_bus_vectors mdp_ui_vectors[] = {
 };
 
 static struct msm_bus_vectors mdp_vga_vectors[] = {
-	/* VGA and less video */
+	
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
@@ -117,7 +116,7 @@ static struct msm_bus_vectors mdp_vga_vectors[] = {
 };
 
 static struct msm_bus_vectors mdp_720p_vectors[] = {
-	/* 720p and less video */
+	
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
@@ -127,7 +126,7 @@ static struct msm_bus_vectors mdp_720p_vectors[] = {
 };
 
 static struct msm_bus_vectors mdp_1080p_vectors[] = {
-	/* 1080p and less video */
+	
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
@@ -215,15 +214,15 @@ static struct msm_bus_scale_pdata mdp_bus_scale_pdata = {
 	.name = "mdp",
 };
 
-int fighter_mdp_gamma(void)
+int ville_mdp_gamma(void)
 {
 	#if 0
 	
-	if (panel_type == PANEL_ID_FIGHTER_SONY_NT
-			|| panel_type == PANEL_ID_FIGHTER_SONY_NT_C1
-			|| panel_type == PANEL_ID_FIGHTER_SONY_NT_C2) {
+	if (panel_type == PANEL_ID_VILLE_SONY_NT
+			|| panel_type == PANEL_ID_VILLE_SONY_NT_C1
+			|| panel_type == PANEL_ID_VILLE_SONY_NT_C2) {
 		
-		mdp_color_enhancement(fighter_sony_nt_gamma, ARRAY_SIZE(fighter_sony_nt_gamma));
+		mdp_color_enhancement(ville_sony_nt_gamma, ARRAY_SIZE(ville_sony_nt_gamma));
 	}
 	#endif
 	return 0;
@@ -243,8 +242,9 @@ static struct msm_panel_common_pdata mdp_pdata = {
 #else
 	.mem_hid = MEMTYPE_EBI1,
 #endif
+	
 
-	.mdp_gamma = fighter_mdp_gamma,
+	.mdp_gamma = ville_mdp_gamma,
 	.mdp_max_clk = 200000000,
 };
 
@@ -306,7 +306,7 @@ static struct resource msm_fb_resources[] = {
 };
 
 static struct msm_fb_platform_data msm_fb_pdata = {
-	.detect_client = fighter_detect_panel,
+	.detect_client = ville_detect_panel,
 };
 
 static struct platform_device msm_fb_device = {
@@ -336,7 +336,7 @@ void __init msm8960_init_fb(void)
 #endif
 }
 
-void __init fighter_allocate_fb_regions(void)
+void __init ville_allocate_fb_regions(void)
 {
 	void *addr;
 	unsigned long size;

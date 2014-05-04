@@ -1,4 +1,4 @@
-/* arch/arm/mach-msm/board-fighter-keypad.c
+/* arch/arm/mach-msm/board-ville-keypad.c
  * Copyright (C) 2010 HTC Corporation.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -20,47 +20,43 @@
 #include <asm/mach-types.h>
 #include <mach/board_htc.h>
 #include <mach/gpio.h>
+#include <linux/moduleparam.h>
 #if 0
 #include "proc_comm.h"
 #endif
 #include <linux/mfd/pm8xxx/pm8921.h>
-#include "board-fighter.h"
+#include "board-ville.h"
 
-#if 0
 static char *keycaps = "--qwerty";
-#endif
 #undef MODULE_PARAM_PREFIX
-#define MODULE_PARAM_PREFIX "board_fighter."
-
-#if 0
+#define MODULE_PARAM_PREFIX "board_ville."
 module_param_named(keycaps, keycaps, charp, 0);
-#endif
 
-static struct gpio_event_direct_entry fighter_keypad_map[] = {
+static struct gpio_event_direct_entry ville_keypad_map[] = {
 	{
-		.gpio = FIGHTER_GPIO_PWR_KEYz,
+		.gpio = VILLE_GPIO_PWR_KEYz,
 		.code = KEY_POWER,
 	},
 	{
-		.gpio = FIGHTER_GPIO_VOL_UPz,
+		.gpio = VILLE_GPIO_VOL_UPz,
 		.code = KEY_VOLUMEUP,
 	},
 	{
-		.gpio = FIGHTER_GPIO_VOL_DOWNz,
+		.gpio = VILLE_GPIO_VOL_DOWNz,
 		.code = KEY_VOLUMEDOWN,
 	},
 };
 
 static uint32_t matirx_inputs_gpio_table[] = {
-	GPIO_CFG(FIGHTER_GPIO_PWR_KEYz, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+	GPIO_CFG(VILLE_GPIO_PWR_KEYz, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
 		 GPIO_CFG_2MA),
-	GPIO_CFG(FIGHTER_GPIO_VOL_UPz, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+	GPIO_CFG(VILLE_GPIO_VOL_UPz, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
 		 GPIO_CFG_2MA),
-	GPIO_CFG(FIGHTER_GPIO_VOL_DOWNz, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+	GPIO_CFG(VILLE_GPIO_VOL_DOWNz, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
 		 GPIO_CFG_2MA),
 };
 
-static void fighter_direct_inputs_gpio(void)
+static void ville_direct_inputs_gpio(void)
 {
 	gpio_tlmm_config(matirx_inputs_gpio_table[0], GPIO_CFG_ENABLE);
 	gpio_tlmm_config(matirx_inputs_gpio_table[1], GPIO_CFG_ENABLE);
@@ -69,7 +65,7 @@ static void fighter_direct_inputs_gpio(void)
 	return;
 }
 
-static struct gpio_event_input_info fighter_keypad_power_info = {
+static struct gpio_event_input_info ville_keypad_power_info = {
 	.info.func = gpio_event_input_func,
 	.flags = GPIOEDF_PRINT_KEYS,
 	.type = EV_KEY,
@@ -78,31 +74,31 @@ static struct gpio_event_input_info fighter_keypad_power_info = {
 # else
 	.debounce_time.tv64 = 20 * NSEC_PER_MSEC,
 # endif
-	.keymap = fighter_keypad_map,
-	.keymap_size = ARRAY_SIZE(fighter_keypad_map),
-	.setup_input_gpio = fighter_direct_inputs_gpio,
+	.keymap = ville_keypad_map,
+	.keymap_size = ARRAY_SIZE(ville_keypad_map),
+	.setup_input_gpio = ville_direct_inputs_gpio,
 };
 
-static struct gpio_event_info *fighter_keypad_info[] = {
-	&fighter_keypad_power_info.info,
+static struct gpio_event_info *ville_keypad_info[] = {
+	&ville_keypad_power_info.info,
 };
 
-static struct gpio_event_platform_data fighter_keypad_data = {
+static struct gpio_event_platform_data ville_keypad_data = {
 	.name = "keypad_8960",
-	.info = fighter_keypad_info,
-	.info_count = ARRAY_SIZE(fighter_keypad_info),
+	.info = ville_keypad_info,
+	.info_count = ARRAY_SIZE(ville_keypad_info),
 };
 
-static struct platform_device fighter_keypad_device = {
+static struct platform_device ville_keypad_device = {
 	.name = GPIO_EVENT_DEV_NAME,
 	.id = 0,
 	.dev		= {
-		.platform_data	= &fighter_keypad_data,
+		.platform_data	= &ville_keypad_data,
 	},
 };
 
-static struct keyreset_platform_data fighter_reset_keys_pdata = {
-	/*.keys_up = fighter_reset_keys_up,*/
+static struct keyreset_platform_data ville_reset_keys_pdata = {
+	
 	.keys_down = {
 		KEY_POWER,
 		KEY_VOLUMEDOWN,
@@ -111,16 +107,16 @@ static struct keyreset_platform_data fighter_reset_keys_pdata = {
 	},
 };
 
-static struct platform_device fighter_reset_keys_device = {
+static struct platform_device ville_reset_keys_device = {
 	.name = KEYRESET_NAME,
-	.dev.platform_data = &fighter_reset_keys_pdata,
+	.dev.platform_data = &ville_reset_keys_pdata,
 };
 
-int __init fighter_init_keypad(void)
+int __init ville_init_keypad(void)
 {
-	if (platform_device_register(&fighter_reset_keys_device))
+	if (platform_device_register(&ville_reset_keys_device))
 		printk(KERN_WARNING "%s: register reset key fail\n", __func__);
 
-	return platform_device_register(&fighter_keypad_device);
+	return platform_device_register(&ville_keypad_device);
 }
 
