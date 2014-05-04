@@ -99,6 +99,7 @@ makek*
 *.exe
 *.o
 *.so
+*.ko 
 
 # Packages #
 ############
