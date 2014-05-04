@@ -1,4 +1,4 @@
-KERNEL_BUILD := /work1/a5it_backup/HTC/build-andro/kernel_compare/infernal-k99_3410_remake-base/
+KERNEL_BUILD := /media/work1/toolchain/infernal-k99_3410_remake-base/
 
 obj-m += kcontrol_gpu_msm.o
 
