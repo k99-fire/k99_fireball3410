@@ -1,7 +1,7 @@
 config NFC_NCI
 	depends on NFC && EXPERIMENTAL
 	tristate "NCI protocol support (EXPERIMENTAL)"
-	default n
+	default y
 	help
 	  NCI (NFC Controller Interface) is a communication protocol between
 	  an NFC Controller (NFCC) and a Device Host (DH).

@@ -1,0 +1,6 @@
+git add .
+echo "Please input commit message"
+read commit
+git commit -m "$commit"
+git push origin master
+

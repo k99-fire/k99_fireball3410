@@ -3139,7 +3139,7 @@ static struct android_usb_platform_data android_usb_pdata = {
 	.usb_id_pin_gpio = FIGHTER_GPIO_USB_ID1,
 	.usb_rmnet_interface = "smd,bam",
 	.fserial_init_string = "smd:modem,tty,tty:autobot,tty:serial,tty:autobot",
-	.nluns = 2,
+	.nluns = 1,
 #ifdef CONFIG_USB_GADGET_VERIZON_PRODUCT_ID
 	.match = fighter_usb_product_id_match,
 #endif
@@ -3173,8 +3173,8 @@ void fighter_add_usb_devices(void)
 
 	/* add cdrom support in normal mode */
 	if (board_mfg_mode() == 0) {
-		android_usb_pdata.nluns = 3;
-		android_usb_pdata.cdrom_lun = 0x4;
+		android_usb_pdata.nluns = 2;
+		android_usb_pdata.cdrom_lun = 0x2;
 	}
 	android_usb_pdata.serial_number = board_serialno();
 
@@ -3487,22 +3487,6 @@ static struct akm8975_platform_data compass_platform_data = {
 	.layouts = FIGHTER_LAYOUTS,
 };
 
-static struct r3gd20_gyr_platform_data gyro_platform_data = {
-       .fs_range = R3GD20_GYR_FS_2000DPS,
-       .axis_map_x = 1,
-       .axis_map_y = 0,
-       .axis_map_z = 2,
-       .negate_x = 0,
-       .negate_y = 1,
-       .negate_z = 0,
-
-       .poll_interval = 50,
-       .min_interval = R3GD20_MIN_POLL_PERIOD_MS, 
-
-       .watermark = 0,
-       .fifomode = 0,
-};
-
 static struct i2c_board_info msm_i2c_gsbi12_info[] = {
 	{
 		I2C_BOARD_INFO(BMA250_I2C_NAME, 0x30 >> 1),
@@ -3513,47 +3497,6 @@ static struct i2c_board_info msm_i2c_gsbi12_info[] = {
 		I2C_BOARD_INFO(AKM8975_I2C_NAME, 0x1A >> 1),
 		.platform_data = &compass_platform_data,
 		.irq = MSM_GPIO_TO_INT(FIGHTER_GPIO_COMPASS_INT),
-	},
-	{
-		I2C_BOARD_INFO(R3GD20_GYR_DEV_NAME, 0xD0 >> 1),
-		.platform_data = &gyro_platform_data,
-	},
-};
-
-static struct mpu3050_platform_data mpu3050_data = {
-	.int_config = 0x10,
-	.orientation = { 1, 0, 0,
-			 0, 1, 0,
-			 0, 0, 1 },
-	.level_shifter = 0,
-
-	.accel = {
-		.get_slave_descr = get_accel_slave_descr,
-		.adapt_num = MSM_8960_GSBI12_QUP_I2C_BUS_ID, 
-		.bus = EXT_SLAVE_BUS_SECONDARY,
-		.address = 0x30 >> 1,
-			.orientation = { 1, 0, 0,
-					 0, 1, 0,
-					 0, 0, 1 },
-
-	},
-
-	.compass = {
-		.get_slave_descr = get_compass_slave_descr,
-		.adapt_num = MSM_8960_GSBI12_QUP_I2C_BUS_ID, 
-		.bus = EXT_SLAVE_BUS_PRIMARY,
-		.address = 0x1A >> 1,
-			.orientation = { 1, 0, 0,
-					 0, 1, 0,
-					 0, 0, 1 },
-	},
-};
-
-static struct i2c_board_info __initdata mpu3050_GSBI12_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("mpu3050", 0xD0 >> 1),
-		.irq = MSM_GPIO_TO_INT(FIGHTER_GPIO_GYRO_INT),
-		.platform_data = &mpu3050_data,
 	},
 };
 
@@ -4646,19 +4589,7 @@ static void __init register_i2c_devices(void)
 						msm8960_i2c_devices[i].len);
 		}
 	}
-	
-	printk(KERN_DEBUG "%s: gy_type = %d\n", __func__, gy_type);
-
-	if (gy_type == 2) {
-		i2c_register_board_info(MSM_8960_GSBI12_QUP_I2C_BUS_ID,
-				msm_i2c_gsbi12_info,
-				ARRAY_SIZE(msm_i2c_gsbi12_info));
-	} else {
-		i2c_register_board_info(MSM_8960_GSBI12_QUP_I2C_BUS_ID,
-				mpu3050_GSBI12_boardinfo,
-				ARRAY_SIZE(mpu3050_GSBI12_boardinfo));
-	}
-	
+		
 	if (system_rev < 3) {
 		i2c_register_board_info(MSM_8960_GSBI12_QUP_I2C_BUS_ID,
 			i2c_CM36282_devices, ARRAY_SIZE(i2c_CM36282_devices));

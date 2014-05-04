@@ -118,7 +118,6 @@ extern int msm_pm8921_regulator_pdata_len __devinitdata;
 #define FIGHTER_GPIO_GSENSOR_INT		(67)
 #define FIGHTER_GPIO_CAM2_RSTz			(68)
 #define FIGHTER_GPIO_NC_69			(69)
-#define FIGHTER_GPIO_GYRO_INT                   (69)
 #define FIGHTER_GPIO_COMPASS_INT		(70)
 #define FIGHTER_GPIO_HS_TX_CPU			(71)
 #define FIGHTER_GPIO_HS_RX_CPU			(72)
