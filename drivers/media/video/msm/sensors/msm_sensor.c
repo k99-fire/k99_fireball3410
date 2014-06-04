@@ -280,6 +280,33 @@ int32_t msm_sensor_set_fps(struct msm_sensor_ctrl_t *s_ctrl,
 	return 0;
 }
 
+int32_t msm_sensor_write_exp_gain01(struct msm_sensor_ctrl_t *s_ctrl,
+		uint16_t gain, uint32_t line)
+{
+	uint32_t fl_lines;
+	uint8_t offset;
+	CDBG("%s: called\n", __func__);
+
+	fl_lines = s_ctrl->curr_frame_length_lines;
+	fl_lines = (fl_lines * s_ctrl->fps_divider) / Q10;
+	offset = s_ctrl->sensor_exp_gain_info->vert_offset;
+	if (line > (fl_lines - offset))
+		fl_lines = line + offset;
+
+	s_ctrl->func_tbl->sensor_group_hold_on(s_ctrl);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		s_ctrl->sensor_output_reg_addr->frame_length_lines, fl_lines,
+		MSM_CAMERA_I2C_WORD_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		s_ctrl->sensor_exp_gain_info->coarse_int_time_addr, line,
+		MSM_CAMERA_I2C_WORD_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		s_ctrl->sensor_exp_gain_info->global_gain_addr, gain,
+		MSM_CAMERA_I2C_WORD_DATA);
+	s_ctrl->func_tbl->sensor_group_hold_off(s_ctrl);
+	return 0;
+}
+
 int32_t msm_sensor_write_exp_gain1(struct msm_sensor_ctrl_t *s_ctrl,
 		uint16_t gain, uint32_t line)
 {
@@ -378,6 +405,55 @@ int32_t msm_sensor_setting3(struct msm_sensor_ctrl_t *s_ctrl,
 		msleep(50);
 	}
 	return rc;
+}
+
+int32_t msm_sensor_write_exp_gain01_ex(struct msm_sensor_ctrl_t *s_ctrl,
+		int mode, uint16_t gain, uint16_t dig_gain, uint32_t line) /* HTC Angie 20111019 - Fix FPS */
+{
+	uint32_t fl_lines;
+	uint8_t offset;
+	/* HTC_START Angie 20111019 - Fix FPS */
+	uint32_t fps_divider = Q10;
+	CDBG("%s: called\n", __func__);
+
+	if (mode == SENSOR_PREVIEW_MODE)
+		fps_divider = s_ctrl->fps_divider;
+
+	if(line > s_ctrl->sensor_exp_gain_info->sensor_max_linecount)
+		line = s_ctrl->sensor_exp_gain_info->sensor_max_linecount;
+
+	fl_lines = s_ctrl->curr_frame_length_lines;
+	offset = s_ctrl->sensor_exp_gain_info->vert_offset;
+	if (line * Q10 > (fl_lines - offset) * fps_divider)
+		fl_lines = line + offset;
+	else
+		fl_lines = (fl_lines * fps_divider) / Q10;
+	/* HTC_END */
+
+	/*HTC start Tom 20120209  - fix black screen caused by line count > frame length lines -5*/
+	if (line > fl_lines -offset)
+		line = fl_lines -offset;
+	/*HTC end*/
+
+	s_ctrl->func_tbl->sensor_group_hold_on(s_ctrl);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		s_ctrl->sensor_output_reg_addr->frame_length_lines, fl_lines,
+		MSM_CAMERA_I2C_WORD_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		s_ctrl->sensor_exp_gain_info->coarse_int_time_addr, line,
+		MSM_CAMERA_I2C_WORD_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		s_ctrl->sensor_exp_gain_info->global_gain_addr, gain,
+		MSM_CAMERA_I2C_WORD_DATA);
+	
+	if (s_ctrl->func_tbl->sensor_set_dig_gain)
+		s_ctrl->func_tbl->sensor_set_dig_gain(s_ctrl, dig_gain);
+	
+	s_ctrl->func_tbl->sensor_group_hold_off(s_ctrl);
+
+	pr_info("%s write fl_lines : %d ; write line_cnt : %d ; write gain : %d \n", __func__, fl_lines,  line, gain);
+
+	return 0;
 }
 
 int32_t msm_sensor_write_exp_gain1_ex(struct msm_sensor_ctrl_t *s_ctrl,

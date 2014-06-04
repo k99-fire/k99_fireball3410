@@ -613,18 +613,11 @@ static struct msm_camera_sensor_info msm_camera_sensor_s5k3h2yx_data = {
 	.flash_cfg = &msm_camera_sensor_s5k3h2yx_flash_cfg, /* Andrew_Cheng linear led 20111205 */
 	.camera_type = BACK_CAMERA_2D,
 };
-
-struct platform_device fighter_camera_sensor_s5k3h2yx = {
-	.name	= "msm_camera_s5k3h2yx",
-	.dev	= {
-		.platform_data = &msm_camera_sensor_s5k3h2yx_data,
-	},
-};
 #endif /* CONFIG_S5K3H2YX */
 
 //HTC start Tom Lin 2011/12/19
-#ifdef CONFIG_IMX105
-static int fighter_imx105_vreg_on(void)
+#ifdef CONFIG_IMX175_2LANE
+static int fighter_imx175_vreg_on(void)
 {
 	int rc;
 	pr_info("%s\n", __func__);
@@ -697,7 +690,7 @@ enable_vcm_fail:
 	return rc;
 }
 
-static int fighter_imx105_vreg_off(void)
+static int fighter_imx175_vreg_off(void)
 {
 	int rc = 0;
 
@@ -746,25 +739,25 @@ static int fighter_imx105_vreg_off(void)
 	return rc;
 }
 
-#ifdef CONFIG_IMX105_ACT
-static struct i2c_board_info imx105_actuator_i2c_info = {
+#ifdef CONFIG_IMX175_ACT
+static struct i2c_board_info imx175_actuator_i2c_info = {
 	I2C_BOARD_INFO("imx105_act", 0x1B),
 };
 
-static struct msm_actuator_info imx105_actuator_info = {
-	.board_info     = &imx105_actuator_i2c_info,
+static struct msm_actuator_info imx175_actuator_info = {
+	.board_info     = &imx175_actuator_i2c_info,
 	.bus_id         = MSM_8960_GSBI4_QUP_I2C_BUS_ID,
 	.vcm_pwd        = FIGHTER_GPIO_CAM_VCM_PD,
 	.vcm_enable     = 1,
 };
 #endif
 
-static struct msm_camera_csi_lane_params imx105_csi_lane_params = {
+static struct msm_camera_csi_lane_params imx175_csi_lane_params = {
 	.csi_lane_assign = 0xE4,
-	.csi_lane_mask = 0x1,
+	.csi_lane_mask = 0x3,
 };
 
-static struct msm_camera_sensor_platform_info sensor_imx105_board_info = {
+static struct msm_camera_sensor_platform_info sensor_imx175_board_info = {
 	.mount_angle = 90,
 	.mirror_flip = CAMERA_SENSOR_NONE,
 	.sensor_reset_enable = 0,
@@ -772,11 +765,59 @@ static struct msm_camera_sensor_platform_info sensor_imx105_board_info = {
 	.sensor_pwd	= FIGHTER_GPIO_CAM_PWDN,
 	.vcm_pwd	= FIGHTER_GPIO_CAM_VCM_PD,
 	.vcm_enable	= 1,
-	.csi_lane_params = &imx105_csi_lane_params,
+	.csi_lane_params = &imx175_csi_lane_params,
 };
 
 /* Andrew_Cheng linear led 20111205 MB */
-static struct camera_led_est msm_camera_sensor_imx105_led_table[] = {
+static struct camera_led_est msm_camera_sensor_imx175_led_table[] = {
+	{
+		.enable = 1,
+		.led_state = FL_MODE_FLASH_LEVEL2,
+		.current_ma = 200,
+		.lumen_value = 250,
+		.min_step = 58,
+		.max_step = 256
+	},
+	{
+		.enable = 1,
+		.led_state = FL_MODE_FLASH_LEVEL3,
+		.current_ma = 300,
+		.lumen_value = 350,
+		.min_step = 54,
+		.max_step = 57
+	},
+	{
+		.enable = 1,
+		.led_state = FL_MODE_FLASH_LEVEL4,
+		.current_ma = 400,
+		.lumen_value = 440,
+		.min_step = 50,
+		.max_step = 53
+	},
+	{
+		.enable = 1,
+		.led_state = FL_MODE_FLASH_LEVEL6,
+		.current_ma = 600,
+		.lumen_value = 625,
+		.min_step = 46,
+		.max_step = 49
+	},
+	{
+		.enable = 1,
+		.led_state = FL_MODE_FLASH,
+		.current_ma = 750,
+		.lumen_value = 745,
+		.min_step = 0,
+		.max_step = 45    
+	},
+	{
+		.enable = 2,
+		.led_state = FL_MODE_FLASH_LEVEL2,
+		.current_ma = 200,
+		.lumen_value = 250,
+		.min_step = 0,
+		.max_step = 270
+	},
 	{
 		.enable = 0,
 		.led_state = FL_MODE_OFF,
@@ -827,57 +868,50 @@ static struct camera_led_est msm_camera_sensor_imx105_led_table[] = {
 	},
 };
 
-static struct camera_led_info msm_camera_sensor_imx105_led_info = {
+static struct camera_led_info msm_camera_sensor_imx175_led_info = {
 	.enable = 1,
 	.low_limit_led_state = FL_MODE_TORCH,
 	.max_led_current_ma = 750,
-	.num_led_est_table = ARRAY_SIZE(msm_camera_sensor_imx105_led_table),
+	.num_led_est_table = ARRAY_SIZE(msm_camera_sensor_imx175_led_table),
 };
 
-static struct camera_flash_info msm_camera_sensor_imx105_flash_info = {
-	.led_info = &msm_camera_sensor_imx105_led_info,
-	.led_est_table = msm_camera_sensor_imx105_led_table,
+static struct camera_flash_info msm_camera_sensor_imx175_flash_info = {
+	.led_info = &msm_camera_sensor_imx175_led_info,
+	.led_est_table = msm_camera_sensor_imx175_led_table,
 };
 
-static struct camera_flash_cfg msm_camera_sensor_imx105_flash_cfg = {
+static struct camera_flash_cfg msm_camera_sensor_imx175_flash_cfg = {
 	.low_temp_limit		= 5,
 	.low_cap_limit		= 15,
-	.flash_info		= &msm_camera_sensor_imx105_flash_info,
+	.flash_info		= &msm_camera_sensor_imx175_flash_info,
 };
 /* Andrew_Cheng linear led 20111205 ME */
 
-static struct msm_camera_sensor_flash_data flash_imx105 = {
+static struct msm_camera_sensor_flash_data flash_imx175 = {
 	.flash_type	= MSM_CAMERA_FLASH_LED,
 #ifdef CONFIG_MSM_CAMERA_FLASH
 	.flash_src	= &msm_flash_src,
 #endif
 };
 
-static struct msm_camera_sensor_info msm_camera_sensor_imx105_data = {
+static struct msm_camera_sensor_info msm_camera_sensor_imx175_data = {
 	.sensor_name		= "imx105",
-	.camera_power_on	= fighter_imx105_vreg_on,
-	.camera_power_off	= fighter_imx105_vreg_off,
+	.camera_power_on	= fighter_imx175_vreg_on,
+	.camera_power_off	= fighter_imx175_vreg_off,
 	.pdata			= &msm_camera_csi_device_data[0],
-	.flash_data		= &flash_imx105,
-	.sensor_platform_info	= &sensor_imx105_board_info,
+	.flash_data		= &flash_imx175,
+	.sensor_platform_info	= &sensor_imx175_board_info,
 	.gpio_conf		= &gpio_conf,
 	.csi_if			= 1,
-#ifdef CONFIG_IMX105_ACT
-	.actuator_info		= &imx105_actuator_info,
+#ifdef CONFIG_IMX175_ACT
+	.actuator_info		= &imx175_actuator_info,
 #endif
 	.use_rawchip		= 0,
 	.camera_type		= BACK_CAMERA_2D,
-	.flash_cfg		= &msm_camera_sensor_imx105_flash_cfg,
+	.flash_cfg		= &msm_camera_sensor_imx175_flash_cfg,
 	/* Andrew_Cheng linear led 20111205 */
 };
-
-struct platform_device fighter_camera_sensor_imx105 = {
-	.name	= "msm_camera_imx105",
-	.dev	= {
-		.platform_data = &msm_camera_sensor_imx105_data,
-	},
-};
-#endif /* CONFIG_IMX105 */
+#endif /* CONFIG_IMX175_2LANE */
 //HTC end Tom Lin 2011/12/19
 
 #ifdef CONFIG_MT9V113
@@ -1021,13 +1055,6 @@ static struct msm_camera_sensor_info msm_camera_sensor_mt9v113_data = {
 	.camera_type = FRONT_CAMERA_2D,
 	.use_rawchip = 0,
 };
-
-struct platform_device fighter_camera_sensor_mt9v113 = {
-	.name	= "msm_camera_mt9v113",
-	.dev	= {
-		.platform_data = &msm_camera_sensor_mt9v113_data,
-	},
-};
 #endif /* CONFIG_MT9V113 */
 
 static void config_cam_id(int status)
@@ -1055,10 +1082,10 @@ struct i2c_board_info msm_camera_boardinfo[] = {
 	},
 #endif
 	//HTC start Tom Lin 2011/12/19
-#ifdef CONFIG_IMX105
+#ifdef CONFIG_IMX175_2LANE
 	{
 		I2C_BOARD_INFO("imx105", 0x1A),
-		.platform_data = &msm_camera_sensor_imx105_data,
+		.platform_data = &msm_camera_sensor_imx175_data,
 	},
 #endif
 	//HTC end Tom Lin 2011/12/19
@@ -1075,7 +1102,6 @@ struct msm_camera_board_info fighter_camera_board_info = {
 	.num_i2c_board_info = ARRAY_SIZE(msm_camera_boardinfo),
 };
 #endif 
-#endif /* CONFIG_MSM_CAMERA */
 
 void __init msm8960_init_cam(void)
 {
@@ -1100,3 +1126,5 @@ void __init msm8960_init_cam(void)
 	platform_device_register(&msm8960_device_vfe);
 	platform_device_register(&msm8960_device_vpe);
 }
+
+#endif /* CONFIG_MSM_CAMERA */

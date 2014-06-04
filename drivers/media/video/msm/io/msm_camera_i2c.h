@@ -79,6 +79,10 @@ struct msm_camera_i2c_enum_conf_array {
 	enum msm_camera_i2c_data_type data_type;
 };
 
+/* HTC_START Tom 20120224 for AF to write lens position in sensor i2c driver*/
+int32_t msm_camera_i2c_write_lens_position(int16_t lens_position);
+/* HTC_END*/
+
 int32_t msm_camera_i2c_rxdata(struct msm_camera_i2c_client *client,
 	unsigned char *rxdata, int data_length);
 
