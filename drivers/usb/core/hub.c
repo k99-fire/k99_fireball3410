@@ -3102,8 +3102,8 @@ static void hub_events(void)
 	struct device *hub_dev;
 	u16 hubstatus;
 	u16 hubchange;
-	u16 portstatus;
-	u16 portchange;
+	u16 portstatus = 0;
+	u16 portchange = 0;
 	int i, ret;
 #if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
 	int j;

@@ -1,0 +1,13 @@
+--- drivers/usb/core/hub.c
++++ drivers/usb/core/hub.c
+@@ -3103,8 +3104,8 @@
+ 	struct device *hub_dev;
+ 	u16 hubstatus;
+ 	u16 hubchange;
+-	u16 portstatus = 0;
+-	u16 portchange = 0;
++	u16 portstatus;
++	u16 portchange;
+ 	int i, ret;
+ #if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
+ 	int j;
