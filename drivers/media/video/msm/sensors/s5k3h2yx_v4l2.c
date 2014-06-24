@@ -14,6 +14,11 @@
 #define S5K3H2YX_READ_FLIP 0x0002			
 #define S5K3H2YX_READ_MIRROR_FLIP 0x0003	
 
+#define S5K3H2_REG_DIGITAL_GAIN_GREEN_R 0x020E
+#define S5K3H2_REG_DIGITAL_GAIN_RED 0x0210
+#define S5K3H2_REG_DIGITAL_GAIN_BLUE 0x0212
+#define S5K3H2_REG_DIGITAL_GAIN_GREEN_B 0x0214
+
 #define DEFAULT_VCM_MAX 73
 #define DEFAULT_VCM_MED 35
 #define DEFAULT_VCM_MIN 8
@@ -692,29 +697,7 @@ static struct msm_sensor_output_info_t s5k3h2yx_dimensions[] = {
 		.binning_rawchip = 0x22,
 #endif 
 	},
-	{
-		.x_output = 0xCD0,
-		.y_output = 0x740,
-		.line_length_pclk = 0xD8E,
-#ifdef CONFIG_RAWCHIP
-		.frame_length_lines = 0x960,  
-#else
-		.frame_length_lines = 0x960,  
-#endif
-		.vt_pixel_clk = 182400000,
-		.op_pixel_clk = 182400000,
-		.binning_factor = 1,
-		.x_addr_start = 0,
-		.y_addr_start = 0x0130,
-		.x_addr_end = 0xCCF,
-		.y_addr_end = 0x86F,
-		.x_even_inc = 1,
-		.x_odd_inc = 1,
-		.y_even_inc = 1,
-		.y_odd_inc = 1,
-		.binning_rawchip = 0x11,
-	},
-	{
+	{/*night mode size*/
 		.x_output = 0x668,
 		.y_output = 0x4D0,
 		.line_length_pclk = 0xD8E,
@@ -735,6 +718,28 @@ static struct msm_sensor_output_info_t s5k3h2yx_dimensions[] = {
 		.y_even_inc = 1,
 		.y_odd_inc = 3,
 		.binning_rawchip = 0x22,
+	},
+	{/*wide full size*/
+		.x_output = 0xCD0,
+		.y_output = 0x740,
+		.line_length_pclk = 0xD8E,
+#ifdef CONFIG_RAWCHIP
+		.frame_length_lines = 0x960,  //0x764
+#else
+		.frame_length_lines = 0x960,  //0x750
+#endif
+		.vt_pixel_clk = 182400000,
+		.op_pixel_clk = 182400000,
+		.binning_factor = 1,
+		.x_addr_start = 0,
+		.y_addr_start = 0x0130,
+		.x_addr_end = 0xCCF,
+		.y_addr_end = 0x86F,
+		.x_even_inc = 1,
+		.x_odd_inc = 1,
+		.y_even_inc = 1,
+		.y_odd_inc = 1,
+		.binning_rawchip = 0x11,
 	},
 };
 
@@ -1137,11 +1142,12 @@ static ssize_t vcm_clib_max_show(struct device *dev,
 }
 static DEVICE_ATTR(sensor, 0444, sensor_vendor_show, NULL);
 static DEVICE_ATTR(lensinfo, 0444, lens_info_show, NULL);
+/* #if 0 */
 static DEVICE_ATTR(vcmclib, 0444, vcm_clib_show, NULL);
 static DEVICE_ATTR(vcmclibmin, 0444, vcm_clib_min_show, NULL);
 static DEVICE_ATTR(vcmclibmed, 0444, vcm_clib_med_show, NULL);
 static DEVICE_ATTR(vcmclibmax, 0444, vcm_clib_max_show, NULL);
-
+/* #endif */
 static struct kobject *android_s5k3h2yx;
 
 static int s5k3h2yx_sysfs_init(void)
@@ -1449,6 +1455,26 @@ get_done:
 	return 0;
 
 }
+/* HTC_END*/
+
+int32_t s5k3h2_set_dig_gain(struct msm_sensor_ctrl_t *s_ctrl, uint16_t dig_gain){
+
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		S5K3H2_REG_DIGITAL_GAIN_GREEN_R, dig_gain,
+		MSM_CAMERA_I2C_BYTE_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		S5K3H2_REG_DIGITAL_GAIN_RED, dig_gain,
+		MSM_CAMERA_I2C_BYTE_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		S5K3H2_REG_DIGITAL_GAIN_BLUE, dig_gain,
+		MSM_CAMERA_I2C_BYTE_DATA);
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		S5K3H2_REG_DIGITAL_GAIN_GREEN_B, dig_gain,
+		MSM_CAMERA_I2C_BYTE_DATA);
+	return 0;
+}
+
+
 static struct msm_sensor_fn_t s5k3h2yx_func_tbl = {
 	.sensor_start_stream = msm_sensor_start_stream,
 	.sensor_stop_stream = msm_sensor_stop_stream,
@@ -1457,6 +1483,7 @@ static struct msm_sensor_fn_t s5k3h2yx_func_tbl = {
 	.sensor_set_fps = msm_sensor_set_fps,
 	.sensor_write_exp_gain_ex = msm_sensor_write_exp_gain1_ex,
 	.sensor_write_snapshot_exp_gain_ex = msm_sensor_write_exp_gain1_ex,
+	.sensor_set_dig_gain = s5k3h2_set_dig_gain,
 	.sensor_setting = msm_sensor_setting,
 	.sensor_set_sensor_mode = msm_sensor_set_sensor_mode,
 	.sensor_mode_init = msm_sensor_mode_init,

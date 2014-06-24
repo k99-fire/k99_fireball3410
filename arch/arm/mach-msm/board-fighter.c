@@ -314,22 +314,21 @@ void fighter_lcd_id_power(int pull)
 
 #ifdef CONFIG_I2C
 
+#define MSM_8960_GSBI2_QUP_I2C_BUS_ID 2
 #define MSM_8960_GSBI4_QUP_I2C_BUS_ID 4
 #define MSM_8960_GSBI3_QUP_I2C_BUS_ID 3
-#define MSM_8960_GSBI2_QUP_I2C_BUS_ID 2
 #define MSM_8960_GSBI8_QUP_I2C_BUS_ID 8
 #define MSM_8960_GSBI12_QUP_I2C_BUS_ID 12
-#define MSM_8960_GSBI5_QUP_I2C_BUS_ID 5
 
 #endif
 
 #define MSM_PMEM_ADSP_SIZE         0x6D00000
-#define MSM_PMEM_ADSP2_SIZE        0x730000
+#define MSM_PMEM_ADSP2_SIZE        0x700000
 #define MSM_PMEM_AUDIO_SIZE        0x4CF000
 #ifdef CONFIG_MSM_IOMMU
 #define MSM_PMEM_SIZE 0x00000000 /* 0 Mbytes */
 #else
-#define MSM_PMEM_SIZE 0x4800000 /* 76.8 Mbytes */
+#define MSM_PMEM_SIZE 0x4000000 /* 64 Mbytes */
 #endif
 #define MSM_LIQUID_PMEM_SIZE 0x4000000 /* 64 Mbytes */
 
@@ -345,7 +344,7 @@ void fighter_lcd_id_power(int pull)
  * 3A, 4K x 15 + 8K x 3
  * ALIGH INTERGER + 1MB
  */
-#define MSM_ION_MM_SIZE		0x4700000
+#define MSM_ION_MM_SIZE		0x3F00000
 #else
 #define MSM_ION_MM_SIZE		MSM_PMEM_ADSP_SIZE - MSM_PMEM_ADSP2_SIZE
 #define MSM_ION_ROTATOR_SIZE	MSM_PMEM_ADSP2_SIZE
@@ -3260,7 +3259,7 @@ static unsigned fighter_perf_acpu_table[] = {
 	810000000, /* LOW */
 	1026000000, /* MEDIUM */
 	1242000000,/* HIGH */
-	1512000000, /* HIGHEST */
+	1458000000, /* HIGHEST */
 };
 
 static struct perflock_data fighter_perflock_data = {
@@ -3340,19 +3339,9 @@ static uint32_t gsbi2_gpio_table[] = {
 	GPIO_CFG(FIGHTER_GPIO_NFC_I2C_CLK, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
-static uint32_t gsbi2_gpio_table_gpio[] = {
-	GPIO_CFG(FIGHTER_GPIO_NFC_I2C_DAT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(FIGHTER_GPIO_NFC_I2C_CLK, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-};
-
 static uint32_t gsbi3_gpio_table[] = {
 	GPIO_CFG(FIGHTER_GPIO_TP_I2C_DAT, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	GPIO_CFG(FIGHTER_GPIO_TP_I2C_CLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-};
-
-static uint32_t gsbi3_gpio_table_gpio[] = {
-	GPIO_CFG(FIGHTER_GPIO_TP_I2C_DAT, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(FIGHTER_GPIO_TP_I2C_CLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
 /* CAMERA setting */
@@ -3361,28 +3350,14 @@ static uint32_t gsbi4_gpio_table[] = {
 	GPIO_CFG(FIGHTER_GPIO_CAM_I2C_CLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
-static uint32_t gsbi4_gpio_table_gpio[] = {
-	GPIO_CFG(FIGHTER_GPIO_CAM_I2C_DAT, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(FIGHTER_GPIO_CAM_I2C_CLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-};
-
 static uint32_t gsbi8_gpio_table[] = {
 	GPIO_CFG(FIGHTER_GPIO_AC_I2C_DAT, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	GPIO_CFG(FIGHTER_GPIO_AC_I2C_CLK, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-};
-static uint32_t gsbi8_gpio_table_gpio[] = {
-	GPIO_CFG(FIGHTER_GPIO_AC_I2C_DAT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(FIGHTER_GPIO_AC_I2C_CLK, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
 static uint32_t gsbi12_gpio_table[] = {
 	GPIO_CFG(FIGHTER_GPIO_SR_I2C_DAT, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	GPIO_CFG(FIGHTER_GPIO_SR_I2C_CLK, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-};
-
-static uint32_t gsbi12_gpio_table_gpio[] = {
-	GPIO_CFG(FIGHTER_GPIO_SR_I2C_DAT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(FIGHTER_GPIO_SR_I2C_CLK, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
 static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
@@ -3395,8 +3370,8 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 	}
 
 	if ((adap_id == MSM_8960_GSBI2_QUP_I2C_BUS_ID) && (config_type == 0)) {
-		gpio_tlmm_config(gsbi2_gpio_table_gpio[0], GPIO_CFG_DISABLE);
-		gpio_tlmm_config(gsbi2_gpio_table_gpio[1], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi2_gpio_table[0], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi2_gpio_table[1], GPIO_CFG_DISABLE);
 	}
 
 	if ((adap_id == MSM_8960_GSBI3_QUP_I2C_BUS_ID) && (config_type == 1)) {
@@ -3405,8 +3380,8 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 	}
 
 	if ((adap_id == MSM_8960_GSBI3_QUP_I2C_BUS_ID) && (config_type == 0)) {
-		gpio_tlmm_config(gsbi3_gpio_table_gpio[0], GPIO_CFG_DISABLE);
-		gpio_tlmm_config(gsbi3_gpio_table_gpio[1], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi3_gpio_table[0], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi3_gpio_table[1], GPIO_CFG_DISABLE);
 	}
 
 	/* CAMERA setting */
@@ -3416,8 +3391,8 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 	}
 
 	if ((adap_id == MSM_8960_GSBI4_QUP_I2C_BUS_ID) && (config_type == 0)) {
-		gpio_tlmm_config(gsbi4_gpio_table_gpio[0], GPIO_CFG_DISABLE);
-		gpio_tlmm_config(gsbi4_gpio_table_gpio[1], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi4_gpio_table[0], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi4_gpio_table[1], GPIO_CFG_DISABLE);
 	}
 
 	if ((adap_id == MSM_8960_GSBI8_QUP_I2C_BUS_ID) && (config_type == 1)) {
@@ -3426,8 +3401,8 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 	}
 
 	if ((adap_id == MSM_8960_GSBI8_QUP_I2C_BUS_ID) && (config_type == 0)) {
-		gpio_tlmm_config(gsbi8_gpio_table_gpio[0], GPIO_CFG_DISABLE);
-		gpio_tlmm_config(gsbi8_gpio_table_gpio[1], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi8_gpio_table[0], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi8_gpio_table[1], GPIO_CFG_DISABLE);
 	}
 
 	if ((adap_id == MSM_8960_GSBI12_QUP_I2C_BUS_ID) && (config_type == 1)) {
@@ -3436,8 +3411,8 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 	}
 
 	if ((adap_id == MSM_8960_GSBI12_QUP_I2C_BUS_ID) && (config_type == 0)) {
-		gpio_tlmm_config(gsbi12_gpio_table_gpio[0], GPIO_CFG_DISABLE);
-		gpio_tlmm_config(gsbi12_gpio_table_gpio[1], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi12_gpio_table[0], GPIO_CFG_DISABLE);
+		gpio_tlmm_config(gsbi12_gpio_table[1], GPIO_CFG_DISABLE);
 	}
 }
 
@@ -3467,12 +3442,6 @@ static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi8_pdata = {
 };
 
 static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi12_pdata = {
-	.clk_freq = 400000,
-	.src_clk_rate = 24000000,
-	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
-};
-
-static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi5_pdata = {
 	.clk_freq = 400000,
 	.src_clk_rate = 24000000,
 	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
@@ -3585,12 +3554,10 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_device_saw_core1,
 	&msm8960_device_ext_5v_vreg,
 	&msm8960_device_ssbi_pmic,
-	&msm8960_device_qup_spi_gsbi10,
 	&msm8960_device_qup_i2c_gsbi2,
 	&msm8960_device_qup_i2c_gsbi3,
 	&msm8960_device_qup_i2c_gsbi4,
 	&msm8960_device_qup_i2c_gsbi8,
-	&msm8960_device_qup_i2c_gsbi5,
 #ifndef CONFIG_MSM_DSPS
 	&msm8960_device_qup_i2c_gsbi12,
 #endif
@@ -3734,9 +3701,6 @@ static void __init msm8960_i2c_init(void)
 
 	msm8960_device_qup_i2c_gsbi12.dev.platform_data =
 					&msm8960_i2c_qup_gsbi12_pdata;
-
-	msm8960_device_qup_i2c_gsbi5.dev.platform_data =
-					&msm8960_i2c_qup_gsbi5_pdata;
 }
 
 static void __init msm8960_gfx_init(void)
@@ -4192,7 +4156,7 @@ static struct pm8xxx_led_configure pm8921_led_info[] = {
 		.duites_size 	= 8,
 		.duty_time_ms 	= 64,
 		.lut_flag 	= PM_PWM_LUT_RAMP_UP | PM_PWM_LUT_PAUSE_HI_EN,
-		.out_current    = 40,
+		.out_current    = 10,
 		.duties		= {0, 15, 30, 45, 60, 75, 90, 100,
 				100, 90, 75, 60, 45, 30, 15, 0,
 				0, 0, 0, 0, 0, 0, 0, 0,

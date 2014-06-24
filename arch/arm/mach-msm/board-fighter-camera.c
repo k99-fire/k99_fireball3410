@@ -761,7 +761,7 @@ static struct msm_actuator_info imx105_actuator_info = {
 
 static struct msm_camera_csi_lane_params imx105_csi_lane_params = {
 	.csi_lane_assign = 0xE4,
-	.csi_lane_mask = 0x1,
+	.csi_lane_mask = 0x3,
 };
 
 static struct msm_camera_sensor_platform_info sensor_imx105_board_info = {
@@ -993,7 +993,7 @@ static struct msm_camera_csi_lane_params mt9v113_csi_lane_params = {
 static struct msm_camera_sensor_platform_info sensor_mt9v113_board_info = {
 	.mount_angle = 270,
 	.mirror_flip = CAMERA_SENSOR_NONE,
-	.sensor_reset_enable = 1,
+	.sensor_reset_enable = 0,
 	.sensor_reset	= FIGHTER_GPIO_CAM2_RSTz,
 	.sensor_pwd	= FIGHTER_GPIO_CAM_PWDN,
 	.vcm_pwd	= 0,
@@ -1075,7 +1075,6 @@ struct msm_camera_board_info fighter_camera_board_info = {
 	.num_i2c_board_info = ARRAY_SIZE(msm_camera_boardinfo),
 };
 #endif 
-#endif /* CONFIG_MSM_CAMERA */
 
 void __init msm8960_init_cam(void)
 {
@@ -1100,3 +1099,4 @@ void __init msm8960_init_cam(void)
 	platform_device_register(&msm8960_device_vfe);
 	platform_device_register(&msm8960_device_vpe);
 }
+#endif /* CONFIG_MSM_CAMERA */

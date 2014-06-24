@@ -1,4 +1,4 @@
-KERNEL_BUILD := /media/work1/toolchain/infernal-k99_3410_remake-base/
+KERNEL_BUILD := /media/work1/toolchain/k99_fireball3410/
 
 obj-m += kcontrol_gpu_msm.o
 

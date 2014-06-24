@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/platform_device.h>
 #include <linux/regulator/pm8xxx-regulator.h>
 #include <linux/regulator/msm-gpio-regulator.h>
 #include <mach/rpm-regulator.h>
@@ -31,10 +30,7 @@ VREG_CONSUMERS(L1) = {
 VREG_CONSUMERS(L2) = {
 	REGULATOR_SUPPLY("8921_l2",		NULL),
 	REGULATOR_SUPPLY("dsi_vdda",		"mipi_dsi.1"),
-	REGULATOR_SUPPLY("dsi_pll_vdda",	"mdp.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_camera_qs_mt9p017.0"),
+/*	REGULATOR_SUPPLY("dsi_pll_vdda",	"mdp.0"), */
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.0"),
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.1"),
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.2"),
@@ -42,7 +38,6 @@ VREG_CONSUMERS(L2) = {
 VREG_CONSUMERS(L3) = {
 	REGULATOR_SUPPLY("8921_l3",		NULL),
 	REGULATOR_SUPPLY("HSUSB_3p3",		"msm_otg"),
-	REGULATOR_SUPPLY("switch_ldo3",		"cable_detect"),
 };
 VREG_CONSUMERS(L4) = {
 	REGULATOR_SUPPLY("8921_l4",		NULL),
@@ -73,13 +68,9 @@ VREG_CONSUMERS(L9) = {
 VREG_CONSUMERS(L10) = {
 	REGULATOR_SUPPLY("8921_l10",		NULL),
 	REGULATOR_SUPPLY("iris_vddpa",		"wcnss_wlan.0"),
-
 };
 VREG_CONSUMERS(L11) = {
 	REGULATOR_SUPPLY("8921_l11",		NULL),
-	REGULATOR_SUPPLY("cam_vana",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vana",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vana",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vana",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vana",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vana",		"4-0048"),
@@ -88,9 +79,6 @@ VREG_CONSUMERS(L11) = {
 };
 VREG_CONSUMERS(L12) = {
 	REGULATOR_SUPPLY("8921_l12",		NULL),
-	REGULATOR_SUPPLY("cam_vdig",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vdig",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vdig",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-0048"),
@@ -103,13 +91,10 @@ VREG_CONSUMERS(L14) = {
 };
 VREG_CONSUMERS(L15) = {
 	REGULATOR_SUPPLY("8921_l15",		NULL),
-	REGULATOR_SUPPLY("vreg_xoadc",		"pm8921-charger"),
+/*	REGULATOR_SUPPLY("vreg_xoadc",		"pm8921-charger"), */
 };
 VREG_CONSUMERS(L16) = {
 	REGULATOR_SUPPLY("8921_l16",		NULL),
-	REGULATOR_SUPPLY("cam_vaf",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vaf",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vaf",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-0048"),
@@ -131,7 +116,7 @@ VREG_CONSUMERS(L22) = {
 VREG_CONSUMERS(L23) = {
 	REGULATOR_SUPPLY("8921_l23",		NULL),
 	REGULATOR_SUPPLY("dsi_vddio",		"mipi_dsi.1"),
-	REGULATOR_SUPPLY("dsi_pll_vddio",	"mdp.0"),
+/*	REGULATOR_SUPPLY("dsi_pll_vddio",	"mdp.0"), */
 	REGULATOR_SUPPLY("hdmi_avdd",		"hdmi_msm.0"),
 	REGULATOR_SUPPLY("pll_vdd",		"pil_riva"),
 	REGULATOR_SUPPLY("pll_vdd",		"pil_qdsp6v4.1"),
@@ -169,7 +154,6 @@ VREG_CONSUMERS(S1) = {
 VREG_CONSUMERS(S2) = {
 	REGULATOR_SUPPLY("8921_s2",		NULL),
 	REGULATOR_SUPPLY("iris_vddrfa",		"wcnss_wlan.0"),
-
 };
 VREG_CONSUMERS(S3) = {
 	REGULATOR_SUPPLY("8921_s3",		NULL),
@@ -214,7 +198,6 @@ VREG_CONSUMERS(S8) = {
 };
 VREG_CONSUMERS(LVS1) = {
 	REGULATOR_SUPPLY("8921_lvs1",		NULL),
-	REGULATOR_SUPPLY("sdc_vdd",		"msm_sdcc.4"),
 	REGULATOR_SUPPLY("iris_vddio",		"wcnss_wlan.0"),
 };
 VREG_CONSUMERS(LVS2) = {
@@ -231,9 +214,6 @@ VREG_CONSUMERS(LVS4) = {
 };
 VREG_CONSUMERS(LVS5) = {
 	REGULATOR_SUPPLY("8921_lvs5",		NULL),
-	REGULATOR_SUPPLY("cam_vio",		"msm_camera_imx074.0"),
-	REGULATOR_SUPPLY("cam_vio",		"msm_camera_ov2720.0"),
-	REGULATOR_SUPPLY("cam_vio",		"msm_camera_qs_mt9p017.0"),
 	REGULATOR_SUPPLY("cam_vio",		"4-001a"),
 	REGULATOR_SUPPLY("cam_vio",		"4-006c"),
 	REGULATOR_SUPPLY("cam_vio",		"4-0048"),
@@ -249,7 +229,7 @@ VREG_CONSUMERS(LVS7) = {
 };
 VREG_CONSUMERS(USB_OTG) = {
 	REGULATOR_SUPPLY("8921_usb_otg",	NULL),
-	REGULATOR_SUPPLY("vbus_otg",		"msm_otg"),
+/*	REGULATOR_SUPPLY("vbus_otg",		"msm_otg"), */
 };
 VREG_CONSUMERS(HDMI_MVS) = {
 	REGULATOR_SUPPLY("8921_hdmi_mvs",	NULL),
