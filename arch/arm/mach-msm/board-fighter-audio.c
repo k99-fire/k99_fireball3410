@@ -24,19 +24,19 @@
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
 #include <sound/jack.h>
+#include <sound/q6asm.h>
 #include <asm/mach-types.h>
 #include <mach/socinfo.h>
 #include <linux/mfd/wcd9xxx/core.h>
-#include <sound/q6asm.h>
 #include <mach/htc_acoustic_8960.h>
 #include "../../../sound/soc/codecs/wcd9310.h"
 #include "../sound/soc/msm/msm-pcm-routing.h"
 #include "board-fighter.h"
 
+static atomic_t q6_effect_mode = ATOMIC_INIT(-1);
+
 #include <mach/cable_detect.h>
 #include <mach/board.h>
-
-static atomic_t q6_effect_mode = ATOMIC_INIT(-1);
 
 #define MSM8960_SPK_ON 1
 #define MSM8960_SPK_OFF 0
@@ -1060,9 +1060,9 @@ static struct snd_soc_dai_link msm8960_dai_common[] = {
 		.be_id = MSM_FRONTEND_DAI_VOLTE,
 	},
 	{
-		.name = "SGLTE",
-		.stream_name = "SGLTE",
-		.cpu_dai_name   = "SGLTE",
+		.name = "Voice2",
+		.stream_name = "Voice2",
+		.cpu_dai_name   = "Voice2",
 		.platform_name  = "msm-pcm-voice",
 		.dynamic = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
@@ -1072,7 +1072,7 @@ static struct snd_soc_dai_link msm8960_dai_common[] = {
 		.ignore_pmdown_time = 1,
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
-		.be_id = MSM_FRONTEND_DAI_SGLTE,
+		.be_id = MSM_FRONTEND_DAI_VOICE2,
 	},
 	
 	{
@@ -1502,6 +1502,7 @@ static int __init fighter_audio_init(void)
 		pr_aud_err("failed to configure tpa2051_en gpio\n");
 
 	mutex_init(&cdc_mclk_mutex);
+	
 	htc_register_q6asm_ops(&qops);
 	htc_register_pcm_routing_ops(&rops);
 	acoustic_register_ops(&acoustic);

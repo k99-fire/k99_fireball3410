@@ -79,7 +79,11 @@ static struct smd_config smd_configs[] = {
 	{5, "APPS_RIVA_ANT_CMD", NULL, SMD_APPS_WCNSS},
 	{6, "APPS_RIVA_ANT_DATA", NULL, SMD_APPS_WCNSS},
 	{7, "DATA1", NULL, SMD_APPS_MODEM},
+	{9, "DATA4", NULL, SMD_APPS_MODEM},
 	{11, "DATA11", NULL, SMD_APPS_MODEM},
+#ifdef CONFIG_BUILD_OMA_DM
+        {19, "DATA3", NULL, SMD_APPS_MODEM},
+#endif
 	{21, "DATA21", NULL, SMD_APPS_MODEM},
 	{27, "GPSNMEA", NULL, SMD_APPS_MODEM},
 	{36, "LOOPBACK", "LOOPBACK_TTY", SMD_APPS_MODEM},
@@ -95,7 +99,7 @@ static int is_in_reset(struct smd_tty_info *info)
 	return info->in_reset;
 }
 
-__maybe_unused static void buf_req_retry(unsigned long param)
+static void buf_req_retry(unsigned long param)
 {
 	struct smd_tty_info *info = (struct smd_tty_info *)param;
 	unsigned long flags;
@@ -137,8 +141,14 @@ static void smd_tty_read(unsigned long param)
 
 		avail = tty_prepare_flip_string(tty, &ptr, avail);
 		if (avail <= 0) {
-			mod_timer(&info->buf_req_timer,
-					jiffies + msecs_to_jiffies(30));
+			if (!timer_pending(&info->buf_req_timer)) {
+				init_timer(&info->buf_req_timer);
+				info->buf_req_timer.expires = jiffies +
+					((30 * HZ)/1000);
+				info->buf_req_timer.function = buf_req_retry;
+				info->buf_req_timer.data = param;
+				add_timer(&info->buf_req_timer);
+			}
 			return;
 		}
 
@@ -509,6 +519,7 @@ static int __init smd_tty_init(void)
 		smd_tty[idx].is_open = 0;
 		init_waitqueue_head(&smd_tty[idx].ch_opened_wait_queue);
 		smd_tty[idx].smd = &smd_configs[n];
+
 		if (idx == DS_IDX) {
 			int legacy_ds = 0;
 
@@ -517,7 +528,7 @@ static int __init smd_tty_init(void)
 			legacy_ds |= cpu_is_qsd8x50() || cpu_is_msm8x55();
 			legacy_ds |= cpu_is_msm8x60() &&
 					(socinfo_get_platform_subtype() == 0x0);
-			#ifdef CONFIG_MACH_DUMMY
+			#ifdef CONFIG_MACH_JEWEL_DD
 			legacy_ds = 1;
 			#endif
 

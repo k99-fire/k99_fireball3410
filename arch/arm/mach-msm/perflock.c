@@ -66,7 +66,7 @@ static struct kernel_param_ops param_ops_str = {
 module_param_cb(debug_mask, &param_ops_str, &debug_mask, S_IWUSR | S_IRUGO);
 
 #ifdef CONFIG_HTC_PNPMGR
-static int legacy_mode = 1;
+static int legacy_mode = 0;
 module_param_cb(legacy_mode, &param_ops_str, &legacy_mode, S_IWUSR | S_IRUGO);
 extern struct kobject *cpufreq_kobj;
 #endif
@@ -633,9 +633,11 @@ static void perf_acpu_table_fixup(void)
 			perf_acpu_table[i] = policy_min * 1000;
 	}
 
+#ifdef PERFLOCK_FIX_UP
 	if (table_size >= 1)
 		if (perf_acpu_table[table_size - 1] < policy_max * 1000)
 			perf_acpu_table[table_size - 1] = policy_max * 1000;
+#endif
 }
 
 static void cpufreq_ceiling_acpu_table_fixup(void)

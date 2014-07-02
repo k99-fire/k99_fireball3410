@@ -32,7 +32,6 @@
 #include <linux/bma250.h>
 #include <linux/slimbus/slimbus.h>
 #include <linux/bootmem.h>
-#include <linux/msm_kgsl.h>
 #ifdef CONFIG_ANDROID_PMEM
 #include <linux/android_pmem.h>
 #endif
@@ -88,6 +87,7 @@
 #include <mach/msm_rtb.h>
 #include <mach/msm_cache_dump.h>
 #include <mach/scm.h>
+#include <mach/kgsl.h>
 #include <linux/fmem.h>
 
 #include "timer.h"
@@ -1097,12 +1097,18 @@ static struct mipi_dsi_platform_data mipi_dsi_pdata = {
 #endif
 
 #ifdef CONFIG_HTC_BATT_8960
+#ifdef CONFIG_HTC_PNPMGR
+extern int pnpmgr_battery_charging_enabled(int charging_enabled);
+#endif 
+static int critical_alarm_voltage_mv[] = {3000, 3200, 3400};
+
 static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.guage_driver = 0,
 	.chg_limit_active_mask = HTC_BATT_CHG_LIMIT_BIT_TALK |
 								HTC_BATT_CHG_LIMIT_BIT_NAVI,
 	.critical_low_voltage_mv = 3100,
-	.critical_alarm_voltage_mv = 3000,
+	.critical_alarm_vol_ptr = critical_alarm_voltage_mv,
+	.critical_alarm_vol_cols = sizeof(critical_alarm_voltage_mv) / sizeof(int),
 	.overload_vol_thr_mv = 4000,
 	.overload_curr_thr_ma = 0,
 	
@@ -1121,6 +1127,9 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 						cable_detect_register_notifier,
 	.icharger.dump_all = pm8921_dump_all,
 	.icharger.get_attr_text = pm8921_charger_get_attr_text,
+	.icharger.max_input_current =pm8921_set_hsml_target_ma,
+	.icharger.is_safty_timer_timeout = pm8921_is_chg_safety_timer_timeout,
+	.icharger.is_battery_full_eoc_stop = pm8921_is_batt_full_eoc_stop,
 	
 	.igauge.name = "pm8921",
 	.igauge.get_battery_voltage = pm8921_get_batt_voltage,
@@ -1137,6 +1146,10 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.igauge.enable_lower_voltage_alarm = pm8xxx_batt_lower_alarm_enable,
 	.igauge.set_lower_voltage_alarm_threshold =
 						pm8xxx_batt_lower_alarm_threshold_set,
+	
+#ifdef CONFIG_HTC_PNPMGR
+	.notify_pnpmgr_charging_enabled = pnpmgr_battery_charging_enabled,
+#endif 
 };
 
 static struct platform_device htc_battery_pdev = {
@@ -3006,45 +3019,6 @@ static struct platform_device hdmi_msm_device = {
 	.dev.platform_data = &hdmi_msm_data,
 };
 #endif 
-#if 0
-#ifdef CONFIG_MSM_BUS_SCALING
-static struct msm_bus_vectors dtv_bus_init_vectors[] = {
-	{
-		.src = MSM_BUS_MASTER_MDP_PORT0,
-		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab = 0,
-		.ib = 0,
-	},
-};
-static struct msm_bus_vectors dtv_bus_def_vectors[] = {
-	{
-		.src = MSM_BUS_MASTER_MDP_PORT0,
-		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab = 566092800 * 2,
-		.ib = 707616000 * 2,
-	},
-};
-static struct msm_bus_paths dtv_bus_scale_usecases[] = {
-	{
-		ARRAY_SIZE(dtv_bus_init_vectors),
-		dtv_bus_init_vectors,
-	},
-	{
-		ARRAY_SIZE(dtv_bus_def_vectors),
-		dtv_bus_def_vectors,
-	},
-};
-static struct msm_bus_scale_pdata dtv_bus_scale_pdata = {
-	dtv_bus_scale_usecases,
-	ARRAY_SIZE(dtv_bus_scale_usecases),
-	.name = "dtv",
-};
-
-static struct lcdc_platform_data dtv_pdata = {
-	.bus_scale_table = &dtv_bus_scale_pdata,
-};
-#endif
-#endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static int hdmi_enable_5v(int on)
@@ -4243,7 +4217,8 @@ static struct android_usb_platform_data android_usb_pdata = {
 	.functions = usb_functions_all,
 	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
 	.usb_id_pin_gpio = ELITE_GPIO_USB_ID1,
-	.usb_rmnet_interface = "smd,bam",
+	.usb_diag_interface = "diag",
+	.usb_rmnet_interface = "smd:bam",
 	.fserial_init_string = "smd:modem,tty,tty:autobot,tty:serial,tty:autobot",
 	.nluns		= 1,
 };
@@ -4360,39 +4335,6 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.modes = msm_spm_seq_list,
 	},
 };
-
-#ifdef CONFIG_PERFLOCK
-static unsigned elite_perf_acpu_table[] = {
-	594000000, 
-	810000000, 
-	1026000000, 
-	1134000000,
-	1512000000, 
-};
-
-static struct perflock_data elite_perflock_data = {
-	.perf_acpu_table = elite_perf_acpu_table,
-	.table_size = ARRAY_SIZE(elite_perf_acpu_table),
-};
-
-static struct perflock_data elite_cpufreq_ceiling_data = {
-	.perf_acpu_table = elite_perf_acpu_table,
-	.table_size = ARRAY_SIZE(elite_perf_acpu_table),
-};
-
-static struct perflock_pdata perflock_pdata = {
-       .perf_floor = &elite_perflock_data,
-       .perf_ceiling = &elite_cpufreq_ceiling_data,
-};
-
-struct platform_device msm8960_device_perf_lock = {
-       .name = "perf_lock",
-       .id = -1,
-       .dev = {
-               .platform_data = &perflock_pdata,
-       },
-};
-#endif
 
 static uint8_t l2_spm_wfi_cmd_sequence[] __initdata = {
 			0x00, 0x20, 0x03, 0x20,
@@ -5044,11 +4986,6 @@ static struct platform_device *elite_devices[] __initdata = {
 	&msm_cpudai_auxpcm_tx,
 	&msm_cpu_fe,
 	&msm_stub_codec,
-	&msm_kgsl_3d0,
-#ifdef CONFIG_MSM_KGSL_2D
-	&msm_kgsl_2d0,
-	&msm_kgsl_2d1,
-#endif
 #ifdef CONFIG_MSM_GEMINI
 	&msm8960_gemini_device,
 #endif
@@ -5100,13 +5037,33 @@ static void __init msm8960_i2c_init(void)
 
 static void __init msm8960_gfx_init(void)
 {
+	struct kgsl_device_platform_data *kgsl_3d0_pdata =
+		msm_kgsl_3d0.dev.platform_data;
 	uint32_t soc_platform_version = socinfo_get_version();
-	if (SOCINFO_VERSION_MAJOR(soc_platform_version) == 1) {
-		struct kgsl_device_platform_data *kgsl_3d0_pdata =
-				msm_kgsl_3d0.dev.platform_data;
-		kgsl_3d0_pdata->pwrlevel[0].gpu_freq = 320000000;
-		kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 266667000;
-		kgsl_3d0_pdata->nap_allowed = false;
+
+	
+	if (cpu_is_msm8960ab()) {
+		kgsl_3d0_pdata->chipid = ADRENO_CHIPID(3, 2, 1, 0);
+		
+		kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 320000000;
+	} else {
+		kgsl_3d0_pdata->iommu_count = 1;
+		if (SOCINFO_VERSION_MAJOR(soc_platform_version) == 1) {
+			kgsl_3d0_pdata->pwrlevel[0].gpu_freq = 320000000;
+			kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 266667000;
+		}
+		if (SOCINFO_VERSION_MAJOR(soc_platform_version) >= 3) {
+			kgsl_3d0_pdata->chipid = ADRENO_CHIPID(2, 2, 0, 6);
+		}
+	}
+
+	
+	platform_device_register(&msm_kgsl_3d0);
+
+	
+	if (!cpu_is_msm8960ab()) {
+		platform_device_register(&msm_kgsl_2d0);
+		platform_device_register(&msm_kgsl_2d1);
 	}
 }
 
@@ -5356,7 +5313,11 @@ static struct pm8xxx_mpp_platform_data pm8xxx_mpp_pdata __devinitdata = {
 
 static struct pm8xxx_rtc_platform_data pm8xxx_rtc_pdata __devinitdata = {
 	.rtc_write_enable       = true,
-	.rtc_alarm_powerup	= false,
+#ifdef CONFIG_HTC_OFFMODE_ALARM
+	.rtc_alarm_powerup      = true,
+#else
+	.rtc_alarm_powerup      = false,
+#endif
 };
 
 static struct pm8xxx_pwrkey_platform_data pm8xxx_pwrkey_pdata = {
@@ -5388,6 +5349,7 @@ static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
 	.cool_bat_voltage	= 4200,
 	.warm_bat_voltage	= 4000,
 	.mbat_in_gpio		= ELITE_GPIO_MBAT_IN,
+	.is_embeded_batt	= 1,
 	.thermal_mitigation	= pm8921_therm_mitigation,
 	.thermal_levels		= ARRAY_SIZE(pm8921_therm_mitigation),
 	.cold_thr = PM_SMBC_BATT_TEMP_COLD_THR__HIGH,
@@ -5408,6 +5370,11 @@ static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
 
 static int __init check_dq_setup(char *str)
 {
+	int i = 0;
+	int size = 0;
+
+	size = sizeof(chg_batt_params)/sizeof(chg_batt_params[0]);
+
 	if (!strcmp(str, "PASS")) {
 		pr_info("[BATT] overwrite HV battery config\n");
 		pm8921_chg_pdata.max_voltage = 4340;
@@ -5418,6 +5385,12 @@ static int __init check_dq_setup(char *str)
 		pm8921_chg_pdata.max_voltage = 4200;
 		pm8921_chg_pdata.cool_bat_voltage = 4200;
 		pm8921_bms_pdata.max_voltage_uv = 4200 * 1000;
+
+		for(i=0; i < size; i++)
+		{
+			chg_batt_params[i].max_voltage = 4200;
+			chg_batt_params[i].cool_bat_voltage = 4200;
+		}
 	}
 	return 1;
 }
@@ -5521,64 +5494,59 @@ static struct msm_rpmrs_level msm_rpmrs_levels[] = {
 		MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
-		100, 8000, 100000, 1,
+		1, 784, 180000, 100,
 	},
 #if 0
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
-		2000, 6000, 60100000, 3000,
+		1300, 228, 1200000, 2000,
 	},
 #endif
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, GDHS, MAX, ACTIVE),
 		false,
-		4600, 5000, 60350000, 3500,
+		2000, 138, 1208400, 3200,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
-		MSM_RPMRS_LIMITS(ON, HSFS_OPEN, MAX, ACTIVE),
-		false,
-		6700, 4500, 65350000, 4800,
-	},
-	{
-		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, HSFS_OPEN, ACTIVE, RET_HIGH),
 		false,
-		7400, 3500, 66600000, 5150,
+		6000, 119, 1850300, 9000,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, GDHS, MAX, ACTIVE),
 		false,
-		12100, 2500, 67850000, 5500,
+		9200, 68, 2839200, 16400,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, MAX, ACTIVE),
 		false,
-		14200, 2000, 71850000, 6800,
+		10300, 63, 3128000, 18200,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, ACTIVE, RET_HIGH),
 		false,
-		30100, 500, 75850000, 8800,
+		18000, 10, 4602600, 27000,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, RET_HIGH, RET_LOW),
 		false,
-		30100, 0, 76350000, 9800,
+		20000, 2, 5752000, 32000,
 	},
 };
+
 
 static struct msm_rpmrs_platform_data msm_rpmrs_data __initdata = {
 	.levels = &msm_rpmrs_levels[0],
@@ -5923,10 +5891,8 @@ static void __init elite_init(void)
 #ifdef CONFIG_HTC_BATT_8960
 	htc_battery_cell_init(htc_battery_cells, ARRAY_SIZE(htc_battery_cells));
 #endif 
-
 	platform_add_devices(msm8960_footswitch,
 		msm8960_num_footswitch);
-
 	platform_device_register(&msm8960_device_ext_l2_vreg);
 	platform_add_devices(common_devices, ARRAY_SIZE(common_devices));
 	msm_uart_gsbi_gpio_init();
@@ -5970,7 +5936,6 @@ static void __init elite_init(void)
 		ARRAY_SIZE(msm_slim_devices));
 
 	change_memory_power = &msm8960_change_memory_power;
-	create_proc_read_entry("emmc", 0, NULL, emmc_partition_read_proc, NULL);
 
 #ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
 	if(!cpu_is_krait_v1())

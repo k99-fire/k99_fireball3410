@@ -28,12 +28,17 @@ void msm_bus_rpm_set_mt_mask()
 {
 #ifdef CONFIG_MSM_BUS_RPM_MULTI_TIER_ENABLED
 	struct msm_rpm_iv_pair mt[1];
-	int mask = MSM_RPMRS_MASK_RPM_CTL_MULTI_TIER;
+	int mask = MSM_RPMRS_MASK_RPM_CTL_MULTI_TIER | MSM_RPMRS_MASK_RPM_CTL_VDDCX_SCALING;
 	mt[0].id = MSM_RPM_ID_RPM_CTL;
-	mt[0].value = 2;
+#ifdef CONFIG_MSM_BUS_RPM_VDDCX_SCALING_ENABLED
+	mt[0].value = MSM_RPMRS_MASK_RPM_CTL_MULTI_TIER;
+#else
+	mt[0].value = MSM_RPMRS_MASK_RPM_CTL_MULTI_TIER | MSM_RPMRS_MASK_RPM_CTL_VDDCX_SCALING;
+#endif
 	msm_rpmrs_set_bits_noirq(MSM_RPM_CTX_SET_0, mt, 1,
 		&mask);
 #endif
+
 }
 
 bool msm_bus_rpm_is_mem_interleaved(void)

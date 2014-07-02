@@ -31,9 +31,11 @@ extern int msm_krait_need_wfe_fixup;
 #define WFE_SAFE(fixup, tmp) 				\
 "	mrs	" tmp ", cpsr\n"			\
 "	cmp	" fixup ", #0\n"			\
+"	dsb\n"						\
 "	wfeeq\n"					\
 "	beq	10f\n"					\
 "	cpsid   f\n"					\
+"	dsb\n"						\
 "	mrc	p15, 7, " fixup ", c15, c0, 5\n"	\
 "	bic	" fixup ", " fixup ", #0x10000\n"	\
 "	mcr	p15, 7, " fixup ", c15, c0, 5\n"	\
@@ -131,6 +133,12 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
 
 #define arch_spin_lock_flags(lock, flags) arch_spin_lock(lock)
 
+static inline int arch_spin_is_locked(arch_spinlock_t *lock)
+{
+        unsigned long tmp = ACCESS_ONCE(lock->lock);
+        return (((tmp >> TICKET_SHIFT) ^ tmp) & TICKET_MASK) != 0;
+}
+
 static inline void arch_spin_lock(arch_spinlock_t *lock)
 {
 	unsigned long tmp, ticket, next_ticket;
@@ -157,7 +165,8 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	  [next_ticket]"=&r" (next_ticket), [fixup]"+r" (fixup)
 	: [lockaddr]"r" (&lock->lock), [val1]"r" (1)
 	: "cc");
-	smp_mb();
+	dsb();
+	BUG_ON(!arch_spin_is_locked(lock));
 }
 
 static inline int arch_spin_trylock(arch_spinlock_t *lock)
@@ -177,8 +186,11 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
 	  [next_ticket]"=&r" (next_ticket)
 	: [lockaddr]"r" (&lock->lock), [val1]"r" (1)
 	: "cc");
-	if (!tmp)
-		smp_mb();
+	if (!tmp) {
+		dsb();
+		BUG_ON(!arch_spin_is_locked(lock));
+	}
+
 	return !tmp;
 }
 
@@ -187,6 +199,7 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
 	unsigned long ticket, tmp;
 
 	smp_mb();
+	BUG_ON(!arch_spin_is_locked(lock));
 
 	
 	__asm__ __volatile__(
@@ -225,12 +238,6 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 	  [fixup]"+r" (fixup)
 	: [lockaddr]"r" (&lock->lock)
 	: "cc");
-}
-
-static inline int arch_spin_is_locked(arch_spinlock_t *lock)
-{
-	unsigned long tmp = ACCESS_ONCE(lock->lock);
-	return (((tmp >> TICKET_SHIFT) ^ tmp) & TICKET_MASK) != 0;
 }
 
 static inline int arch_spin_is_contended(arch_spinlock_t *lock)

@@ -24,6 +24,7 @@
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
 #include <sound/jack.h>
+#include <sound/q6asm.h>
 #include <asm/mach-types.h>
 #include <mach/socinfo.h>
 #include <linux/mfd/wcd9xxx/core.h>
@@ -31,6 +32,8 @@
 #include "../../../sound/soc/codecs/wcd9310.h"
 #include "../sound/soc/msm/msm-pcm-routing.h"
 #include "board-elite.h"
+
+static atomic_t q6_effect_mode = ATOMIC_INIT(-1);
 
 #include <mach/cable_detect.h>
 #include <mach/board.h>
@@ -1366,9 +1369,9 @@ static struct snd_soc_dai_link msm8960_dai_common[] = {
 		.be_id = MSM_FRONTEND_DAI_VOLTE,
 	},
 	{
-		.name = "SGLTE",
-		.stream_name = "SGLTE",
-		.cpu_dai_name   = "SGLTE",
+		.name = "Voice2",
+		.stream_name = "Voice2",
+		.cpu_dai_name   = "Voice2",
 		.platform_name  = "msm-pcm-voice",
 		.dynamic = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
@@ -1378,7 +1381,7 @@ static struct snd_soc_dai_link msm8960_dai_common[] = {
 		.ignore_pmdown_time = 1,
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
-		.be_id = MSM_FRONTEND_DAI_SGLTE,
+		.be_id = MSM_FRONTEND_DAI_VOICE2,
 	},
 	
 	{
@@ -1716,6 +1719,19 @@ static struct snd_soc_card snd_soc_card_msm8960 = {
 		.num_controls = ARRAY_SIZE(tabla_msm8960_controls),
 };
 
+void elite_set_q6_effect_mode(int mode)
+{
+	pr_aud_info("%s: mode %d\n", __func__, mode);
+	atomic_set(&q6_effect_mode, mode);
+}
+
+int elite_get_q6_effect_mode(void)
+{
+	int mode = atomic_read(&q6_effect_mode);
+	pr_aud_info("%s: mode %d\n", __func__, mode);
+	return mode;
+}
+
 int elite_get_component_info(void)
 {
 	int ret = 0;
@@ -1736,7 +1752,16 @@ int elite_get_component_info(void)
 }
 
 static struct acoustic_ops acoustic = {
+	.set_q6_effect = elite_set_q6_effect_mode,
 	 .get_hw_component = elite_get_component_info,
+};
+
+static struct q6asm_ops qops = {
+	.get_q6_effect = elite_get_q6_effect_mode,
+};
+
+static struct msm_pcm_routing_ops rops = {
+	.get_q6_effect = elite_get_q6_effect_mode,
 };
 
 static struct platform_device *msm8960_snd_device;
@@ -1794,6 +1819,8 @@ static int __init elite_audio_init(void)
 
 	mutex_init(&cdc_mclk_mutex);
 
+	htc_register_q6asm_ops(&qops);
+	htc_register_pcm_routing_ops(&rops);
 	acoustic_register_ops(&acoustic);
 	return ret;
 

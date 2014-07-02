@@ -32,8 +32,6 @@
 #include "../board-8960.h"
 #include "../board-elite.h"
 
-#define hr_msleep(time) msleep(time)
-
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_PRIM_BUF_SIZE \
 		(roundup((roundup(1280, 32) * roundup(720, 32) * 4), 4096) * 3)
@@ -61,17 +59,7 @@
 #endif  
 
 #define MDP_VSYNC_GPIO 0
-#if 0
 
-#define MIPI_CMD_NOVATEK_QHD_PANEL_NAME	"mipi_cmd_novatek_qhd"
-#define MIPI_VIDEO_NOVATEK_QHD_PANEL_NAME	"mipi_video_novatek_qhd"
-#define MIPI_VIDEO_CHIMEI_WXGA_PANEL_NAME	"mipi_video_chimei_wxga"
-#define MIPI_VIDEO_CHIMEI_WUXGA_PANEL_NAME	"mipi_video_chimei_wuxga"
-#define MIPI_VIDEO_SIMULATOR_VGA_PANEL_NAME	"mipi_video_simulator_vga"
-#define MIPI_CMD_RENESAS_FWVGA_PANEL_NAME	"mipi_cmd_renesas_fwvga"
-#define MIPI_VIDEO_ORISE_720P_PANEL_NAME	"mipi_video_orise_720p"
-#define MIPI_CMD_ORISE_720P_PANEL_NAME		"mipi_cmd_orise_720p"
-#endif
 #define MIPI_VIDEO_TOSHIBA_WSVGA_PANEL_NAME	"mipi_video_toshiba_wsvga"
 #define MIPI_VIDEO_TOSHIBA_WUXGA_PANEL_NAME	"mipi_video_toshiba_wuxga"
 #define HDMI_PANEL_NAME	"hdmi_msm"

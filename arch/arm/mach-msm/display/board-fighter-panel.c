@@ -1959,6 +1959,9 @@ static void fighter_self_refresh_switch(int on)
 		mipi_set_tx_power_mode(1);
 		disable_video_mode_clk();
 	} else {
+		int lost_vsync_count = 0;
+
+		lost_vsync_count = 0;
 		PR_DISP_DEBUG("[SR] %s off\n", __func__);
 		fighter_irq_cnt = 0;
 		mipi_set_tx_power_mode(0);
@@ -2020,22 +2023,13 @@ static void fighter_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	struct mipi_panel_info *mipi;
 
 	mipi  = &mfd->panel_info.mipi;
+
+	PR_DISP_DEBUG("%s+:bl=%d\n", __func__, mfd->bl_level);
 	if (bl_level_prevset == mfd->bl_level)
 		return;
 
 	led_pwm1[1] = fighter_shrink_pwm(mfd->bl_level);
 	
-	mutex_lock(&mfd->dma->ov_mutex);
-	/* mdp4_dsi_cmd_busy_wait: will turn on dsi clock also */
-
-/* Remove the check first for impact MFG test. Command by adb to set backlight not work */
-#if 0
-	if (mdp4_overlay_dsi_state_get() <= ST_DSI_SUSPEND) {
-		mutex_unlock(&mfd->dma->ov_mutex);
-		return;
-	}
-#endif
-
 	if (mfd->bl_level == 0) {
 		cmdreq.cmds = disable_dim;
 		cmdreq.cmds_cnt = ARRAY_SIZE(disable_dim);
@@ -2053,7 +2047,6 @@ static void fighter_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	mipi_dsi_cmdlist_put(&cmdreq);
 
 	bl_level_prevset = mfd->bl_level;
-	mutex_unlock(&mfd->dma->ov_mutex);
 
 	return;
 }
@@ -2171,6 +2164,9 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
 
+				PR_DISP_INFO("%s, panel_type command mode (%d)", ptype, panel_type);
+			} else {
+				PR_DISP_INFO("%s: panel_type command mode is not supported!(%d)", __func__, panel_type);
 			}
 		}
 		mipi_dsi_cmd_bta_sw_trigger(); /* clean up ack_err_status */
@@ -2389,9 +2385,11 @@ static int mipi_cmd_novatek_blue_qhd_pt_init(void)
 	pinfo.bl_min = 1;
 	pinfo.fb_num = 2;
 	pinfo.clk_rate = 482000000;
+	pinfo.read_pointer = 275;
+	
 	pinfo.lcd.vsync_enable = TRUE;
 	pinfo.lcd.hw_vsync_mode = TRUE;
-	pinfo.lcd.refx100 = 6096; /* adjust refx100 to prevent tearing */
+	pinfo.lcd.refx100 = 5700; /* adjust refx100 to prevent tearing */
 
 	pinfo.mipi.mode = DSI_CMD_MODE;
 	pinfo.mipi.dst_format = DSI_CMD_DST_FORMAT_RGB888;

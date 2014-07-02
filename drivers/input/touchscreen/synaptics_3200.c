@@ -4202,7 +4202,8 @@ static void __devinit synaptics_ts_init_async(void *unused, async_cookie_t cooki
 
 static int __devinit synaptics_ts_init(void)
 {
-	return i2c_add_driver(&synaptics_ts_driver);
+	async_schedule(synaptics_ts_init_async, NULL);
+	return 0;
 }
 
 static void __exit synaptics_ts_exit(void)

@@ -65,6 +65,8 @@ extern struct platform_device msm8960_device_uart_gsbi2;
 extern struct platform_device msm8960_device_uart_gsbi3;
 extern struct platform_device msm8960_device_uart_gsbi5;
 extern struct platform_device msm8960_device_uart_gsbi8;
+extern struct platform_device msm8960_device_uart_gsbi10;
+extern struct platform_device msm8960_device_uart_gsbi12;
 extern struct platform_device msm8960_device_ssbi_pmic;
 extern struct platform_device msm8960_device_qup_i2c_gsbi2;
 extern struct platform_device msm8960_device_qup_i2c_gsbi3;
@@ -101,6 +103,7 @@ extern struct platform_device apq8064_device_qup_i2c_gsbi1;
 extern struct platform_device apq8064_device_qup_i2c_gsbi2;
 extern struct platform_device apq8064_device_qup_i2c_gsbi3;
 extern struct platform_device apq8064_device_qup_i2c_gsbi4;
+extern struct platform_device apq8064_device_qup_i2c_gsbi7;
 extern struct platform_device apq8064_device_qup_spi_gsbi5;
 extern struct platform_device apq8064_slim_ctrl;
 extern struct platform_device apq8064_device_ssbi_pmic1;
@@ -338,6 +341,7 @@ struct platform_device *msm_add_gsbi9_uart(void);
 extern struct platform_device msm_device_touchscreen;
 
 extern int gy_type;
+extern int compass_type;
 
 extern struct platform_device led_pdev;
 
@@ -443,4 +447,11 @@ extern struct platform_device msm8625_device_acpuclk;
 extern struct platform_device msm8x50_device_acpuclk;
 extern struct platform_device msm8x60_device_acpuclk;
 extern struct platform_device msm8960_device_acpuclk;
+extern struct platform_device msm8064_device_acpuclk;
 extern struct platform_device msm9615_device_acpuclk;
+#ifdef CONFIG_PERFLOCK
+extern struct platform_device msm8064_device_perf_lock;
+extern struct platform_device msm8960_device_perf_lock;
+extern struct platform_device msm8930_device_perf_lock;
+extern struct platform_device msm8930aa_device_perf_lock;
+#endif

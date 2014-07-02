@@ -144,7 +144,7 @@ void show_mem(unsigned int filter)
 	printk("%d pages shared\n", shared);
 	printk("%d pages swap cached\n", cached);
 	printk("KGSL_ALLOC: %8lu kB\n", kgsl_alloc >> 10);
-	printk("ION_ALLOC: %8d kB\n", ion_alloc >> 10);
+	printk("ION_ALLOC:  %8d kB\n", ion_alloc >> 10);
 }
 
 static void __init find_limits(unsigned long *min, unsigned long *max_low,

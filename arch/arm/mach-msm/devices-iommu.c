@@ -365,25 +365,25 @@ static struct msm_iommu_dev vcodec_b_iommu = {
 static struct msm_iommu_dev gfx3d_iommu = {
 	.name = "gfx3d",
 	.ncb = 3,
-	.ttbr_split = 2,
+	.ttbr_split = 1,
 };
 
 static struct msm_iommu_dev gfx3d1_iommu = {
 	.name = "gfx3d1",
 	.ncb = 3,
-	.ttbr_split = 2,
+	.ttbr_split = 1,
 };
 
 static struct msm_iommu_dev gfx2d0_iommu = {
 	.name = "gfx2d0",
 	.ncb = 2,
-	.ttbr_split = 2,
+	.ttbr_split = 1,
 };
 
 static struct msm_iommu_dev gfx2d1_iommu = {
 	.name = "gfx2d1",
 	.ncb = 2,
-	.ttbr_split = 2,
+	.ttbr_split = 1,
 };
 
 static struct msm_iommu_dev vcap_iommu = {
@@ -1011,7 +1011,7 @@ static int __init iommu_init(void)
 				ARRAY_SIZE(msm_iommu_gfx2d_devs));
 	}
 
-	if (cpu_is_apq8064()) {
+	if (cpu_is_apq8064() || cpu_is_apq8064ab()) {
 		platform_add_devices(msm_iommu_jpegd_devs,
 				ARRAY_SIZE(msm_iommu_jpegd_devs));
 		platform_add_devices(msm_iommu_8064_devs,
@@ -1030,7 +1030,7 @@ static int __init iommu_init(void)
 				ARRAY_SIZE(msm_iommu_gfx2d_ctx_devs));
 	}
 
-	if (cpu_is_apq8064()) {
+	if (cpu_is_apq8064() || cpu_is_apq8064ab()) {
 		platform_add_devices(msm_iommu_jpegd_ctx_devs,
 				ARRAY_SIZE(msm_iommu_jpegd_ctx_devs));
 		platform_add_devices(msm_iommu_8064_ctx_devs,
@@ -1069,7 +1069,7 @@ static void __exit iommu_exit(void)
 			platform_device_unregister(msm_iommu_jpegd_devs[i]);
 	}
 
-	if (cpu_is_apq8064()) {
+	if (cpu_is_apq8064() || cpu_is_apq8064ab()) {
 		for (i = 0; i < ARRAY_SIZE(msm_iommu_8064_ctx_devs); i++)
 			platform_device_unregister(msm_iommu_8064_ctx_devs[i]);
 

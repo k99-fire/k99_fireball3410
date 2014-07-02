@@ -45,6 +45,16 @@ static struct msm_mmc_reg_data mmc_vdd_reg_data[MAX_SDCC_CONTROLLER] = {
 		.hpm_uA = 200000, 
 	},
 	
+	[SDCC2] = {
+		.name = "sdc_vdd",
+		.high_vol_level = 1800000,
+		.low_vol_level = 1800000,
+		.always_on = 1,
+		.lpm_sup = 1,
+		.lpm_uA = 9000,
+		.hpm_uA = 200000, 
+	},
+	
 	[SDCC3] = {
 		.name = "sdc_vdd",
 		.high_vol_level = 2950000,
@@ -53,18 +63,22 @@ static struct msm_mmc_reg_data mmc_vdd_reg_data[MAX_SDCC_CONTROLLER] = {
 	}
 };
 
-static struct msm_mmc_reg_data mmc_vdd_io_reg_data[MAX_SDCC_CONTROLLER] = {
+#if 0 
+static struct msm_mmc_reg_data mmc_vccq_reg_data[1] = {
 	
 	[SDCC1] = {
-		.name = "sdc_vdd_io",
+		.name = "sdc_vccq",
 		.always_on = 1,
 		.high_vol_level = 1800000,
 		.low_vol_level = 1800000,
 		.hpm_uA = 200000, 
-	},
+	}
+};
+
+static struct msm_mmc_reg_data mmc_vddp_reg_data[MAX_SDCC_CONTROLLER] = {
 	
 	[SDCC3] = {
-		.name = "sdc_vdd_io",
+		.name = "sdc_vddp",
 		.high_vol_level = 2950000,
 		.low_vol_level = 1850000,
 		.always_on = 1,
@@ -72,20 +86,42 @@ static struct msm_mmc_reg_data mmc_vdd_io_reg_data[MAX_SDCC_CONTROLLER] = {
 		
 		.hpm_uA = 16000,
 		.lpm_uA = 2000,
-	}
+	},
+	
+	[SDCC4] = {
+		.name = "sdc_vddp",
+		.high_vol_level = 1800000,
+		.low_vol_level = 1800000,
+		.always_on = 1,
+		.lpm_sup = 1,
+		.hpm_uA = 200000, 
+		.lpm_uA = 2000,
+	},
 };
+#endif
 
 static struct msm_mmc_slot_reg_data mmc_slot_vreg_data[MAX_SDCC_CONTROLLER] = {
 	
 	[SDCC1] = {
 		.vdd_data = &mmc_vdd_reg_data[SDCC1],
-		.vdd_io_data = &mmc_vdd_io_reg_data[SDCC1],
+		
+		
+	},
+	
+	[SDCC2] = {
+		.vdd_data = &mmc_vdd_reg_data[SDCC2],
 	},
 	
 	[SDCC3] = {
 		.vdd_data = &mmc_vdd_reg_data[SDCC3],
-		.vdd_io_data = &mmc_vdd_io_reg_data[SDCC3]
-	}
+		
+		
+	},
+	
+	[SDCC4] = {
+		
+		
+	},
 };
 
 static struct msm_mmc_pad_drv sdc1_pad_drv_on_cfg[] = {
@@ -244,6 +280,8 @@ static struct mmc_platform_data msm8960_sdc1_data = {
 	.slot_type = &eva_emmcslot_type,
 	.sup_clk_table	= sdc1_sup_clk_rates,
 	.sup_clk_cnt	= ARRAY_SIZE(sdc1_sup_clk_rates),
+	
+	
 	.nonremovable	= 1,
 	.hc_erase_group_def =1,
 	.vreg_data	= &mmc_slot_vreg_data[SDCC1],

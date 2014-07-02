@@ -32,7 +32,6 @@
 #include <linux/bma250.h>
 #include <linux/slimbus/slimbus.h>
 #include <linux/bootmem.h>
-#include <linux/msm_kgsl.h>
 #ifdef CONFIG_ANDROID_PMEM
 #include <linux/android_pmem.h>
 #endif
@@ -89,6 +88,7 @@
 #include <mach/msm_rtb.h>
 #include <mach/msm_cache_dump.h>
 #include <mach/scm.h>
+#include <mach/kgsl.h>
 #include <linux/fmem.h>
 
 #include "timer.h"
@@ -100,7 +100,6 @@
 #include <mach/cpuidle.h>
 #include "rpm_resources.h"
 #include <mach/mpm.h>
-#include "acpuclock.h"
 #include "rpm_log.h"
 #include "smd_private.h"
 #include "pm-boot.h"
@@ -425,6 +424,7 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.cached = 0,
 	.memory_type = MEMTYPE_EBI1,
 };
+
 static struct platform_device android_pmem_adsp_device = {
 	.name = "android_pmem",
 	.id = 2,
@@ -849,7 +849,6 @@ int id_set_two_phase_freq(int cpufreq);
 #endif  /* CONFIG_FB_MSM_OVERLAY1_WRITEBACK */
 
 #define MDP_VSYNC_GPIO 0
-
 #define MIPI_CMD_NOVATEK_QHD_PANEL_NAME		"mipi_cmd_novatek_qhd"
 #define MIPI_VIDEO_NOVATEK_QHD_PANEL_NAME	"mipi_video_novatek_qhd"
 #define MIPI_VIDEO_TOSHIBA_WSVGA_PANEL_NAME	"mipi_video_toshiba_wsvga"
@@ -860,6 +859,348 @@ int id_set_two_phase_freq(int cpufreq);
 #define MIPI_CMD_ORISE_720P_PANEL_NAME		"mipi_cmd_orise_720p"
 #define HDMI_PANEL_NAME		"hdmi_msm"
 #define TVOUT_PANEL_NAME	"tvout_msm"
+
+#ifdef CONFIG_RAWCHIP
+static struct spi_board_info rawchip_spi_board_info[] __initdata = {
+	{
+		.modalias               = "spi_rawchip",
+		.max_speed_hz           = 27000000,
+		.bus_num                = 1,
+		.chip_select            = 0,
+		.mode                   = SPI_MODE_0,
+	},
+};
+#endif
+
+
+#if 0
+static bool dsi_power_on;
+
+/**
+ * LiQUID panel on/off
+ *
+ * @param on
+ *
+ * @return int
+ */
+static int mipi_dsi_liquid_panel_power(int on)
+{
+	static struct regulator *reg_l2, *reg_ext_3p3v;
+	static int gpio21, gpio24, gpio43;
+	int rc;
+
+	pr_info("%s: on=%d\n", __func__, on);
+
+	gpio21 = PM8921_GPIO_PM_TO_SYS(21); /* disp power enable_n */
+	gpio43 = PM8921_GPIO_PM_TO_SYS(43); /* Displays Enable (rst_n)*/
+	gpio24 = PM8921_GPIO_PM_TO_SYS(24); /* Backlight PWM */
+
+	if (!dsi_power_on) {
+
+		reg_l2 = regulator_get(&msm_mipi_dsi1_device.dev,
+				"dsi_vdda");
+		if (IS_ERR(reg_l2)) {
+			pr_err("could not get 8921_l2, rc = %ld\n",
+				PTR_ERR(reg_l2));
+			return -ENODEV;
+		}
+
+		rc = regulator_set_voltage(reg_l2, 1200000, 1200000);
+		if (rc) {
+			pr_err("set_voltage l2 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+
+		reg_ext_3p3v = regulator_get(&msm_mipi_dsi1_device.dev,
+			"vdd_lvds_3p3v");
+		if (IS_ERR(reg_ext_3p3v)) {
+			pr_err("could not get reg_ext_3p3v, rc = %ld\n",
+			       PTR_ERR(reg_ext_3p3v));
+		    return -ENODEV;
+		}
+
+		rc = gpio_request(gpio21, "disp_pwr_en_n");
+		if (rc) {
+			pr_err("request gpio 21 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+
+		rc = gpio_request(gpio43, "disp_rst_n");
+		if (rc) {
+			pr_err("request gpio 43 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+
+		rc = gpio_request(gpio24, "disp_backlight_pwm");
+		if (rc) {
+			pr_err("request gpio 24 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+
+		dsi_power_on = true;
+	}
+
+	if (on) {
+		rc = regulator_set_optimum_mode(reg_l2, 100000);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_enable(reg_l2);
+		if (rc) {
+			pr_err("enable l2 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+
+		rc = regulator_enable(reg_ext_3p3v);
+		if (rc) {
+			pr_err("enable reg_ext_3p3v failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+
+		/* set reset pin before power enable */
+		gpio_set_value_cansleep(gpio43, 0); /* disp disable (resx=0) */
+
+		gpio_set_value_cansleep(gpio21, 0); /* disp power enable_n */
+		msleep(20);
+		gpio_set_value_cansleep(gpio43, 1); /* disp enable */
+		msleep(20);
+		gpio_set_value_cansleep(gpio43, 0); /* disp enable */
+		msleep(20);
+		gpio_set_value_cansleep(gpio43, 1); /* disp enable */
+		msleep(20);
+	} else {
+		gpio_set_value_cansleep(gpio43, 0);
+		gpio_set_value_cansleep(gpio21, 1);
+
+		rc = regulator_disable(reg_l2);
+		if (rc) {
+			pr_err("disable reg_l2 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_disable(reg_ext_3p3v);
+		if (rc) {
+			pr_err("disable reg_ext_3p3v failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_set_optimum_mode(reg_l2, 100);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int mipi_dsi_cdp_panel_power(int on)
+{
+	static struct regulator *reg_l8, *reg_l23, *reg_l2;
+	static int gpio43;
+	int rc;
+
+	pr_info("%s: state : %d\n", __func__, on);
+
+	if (!dsi_power_on) {
+
+		reg_l8 = regulator_get(&msm_mipi_dsi1_device.dev,
+				"dsi_vdc");
+		if (IS_ERR(reg_l8)) {
+			pr_err("could not get 8921_l8, rc = %ld\n",
+				PTR_ERR(reg_l8));
+			return -ENODEV;
+		}
+		reg_l23 = regulator_get(&msm_mipi_dsi1_device.dev,
+				"dsi_vddio");
+		if (IS_ERR(reg_l23)) {
+			pr_err("could not get 8921_l23, rc = %ld\n",
+				PTR_ERR(reg_l23));
+			return -ENODEV;
+		}
+		reg_l2 = regulator_get(&msm_mipi_dsi1_device.dev,
+				"dsi_vdda");
+		if (IS_ERR(reg_l2)) {
+			pr_err("could not get 8921_l2, rc = %ld\n",
+				PTR_ERR(reg_l2));
+			return -ENODEV;
+		}
+		rc = regulator_set_voltage(reg_l8, 2800000, 3000000);
+		if (rc) {
+			pr_err("set_voltage l8 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_set_voltage(reg_l23, 1800000, 1800000);
+		if (rc) {
+			pr_err("set_voltage l23 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_set_voltage(reg_l2, 1200000, 1200000);
+		if (rc) {
+			pr_err("set_voltage l2 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		gpio43 = PM8921_GPIO_PM_TO_SYS(43);
+		rc = gpio_request(gpio43, "disp_rst_n");
+		if (rc) {
+			pr_err("request gpio 43 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		dsi_power_on = true;
+	}
+	if (on) {
+		rc = regulator_set_optimum_mode(reg_l8, 100000);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l8 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_set_optimum_mode(reg_l23, 100000);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_set_optimum_mode(reg_l2, 100000);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_enable(reg_l8);
+		if (rc) {
+			pr_err("enable l8 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_enable(reg_l23);
+		if (rc) {
+			pr_err("enable l8 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_enable(reg_l2);
+		if (rc) {
+			pr_err("enable l2 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		gpio_set_value_cansleep(gpio43, 1);
+	} else {
+		rc = regulator_disable(reg_l2);
+		if (rc) {
+			pr_err("disable reg_l2 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_disable(reg_l8);
+		if (rc) {
+			pr_err("disable reg_l8 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_disable(reg_l23);
+		if (rc) {
+			pr_err("disable reg_l23 failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = regulator_set_optimum_mode(reg_l8, 100);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l8 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_set_optimum_mode(reg_l23, 100);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		rc = regulator_set_optimum_mode(reg_l2, 100);
+		if (rc < 0) {
+			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
+			return -EINVAL;
+		}
+		gpio_set_value_cansleep(gpio43, 0);
+	}
+	return 0;
+}
+
+static int mipi_dsi_panel_power(int on)
+{
+	int ret;
+
+	pr_info("%s: on=%d\n", __func__, on);
+
+	if (machine_is_msm8960_liquid())
+		ret = mipi_dsi_liquid_panel_power(on);
+	else
+		ret = mipi_dsi_cdp_panel_power(on);
+
+	return ret;
+}
+
+static struct mipi_dsi_platform_data mipi_dsi_pdata = {
+	.vsync_gpio = MDP_VSYNC_GPIO,
+	.dsi_power_save = mipi_dsi_panel_power,
+};
+#endif
+
+#ifdef CONFIG_HTC_BATT_8960
+#ifdef CONFIG_HTC_PNPMGR
+extern int pnpmgr_battery_charging_enabled(int charging_enabled);
+#endif 
+static int critical_alarm_voltage_mv[] = {3000, 3200, 3400};
+
+static struct htc_battery_platform_data htc_battery_pdev_data = {
+	/* param */
+	.guage_driver = 0,
+	.chg_limit_active_mask = HTC_BATT_CHG_LIMIT_BIT_TALK |
+								HTC_BATT_CHG_LIMIT_BIT_NAVI,
+	.critical_low_voltage_mv = 3100,
+	.critical_alarm_vol_ptr = critical_alarm_voltage_mv,
+	.critical_alarm_vol_cols = sizeof(critical_alarm_voltage_mv) / sizeof(int),
+	.overload_vol_thr_mv = 4000,
+	.overload_curr_thr_ma = 0,
+	/* charger */
+	.icharger.name = "pm8921",
+	.icharger.get_charging_source = pm8921_get_charging_source,
+	.icharger.get_charging_enabled = pm8921_get_charging_enabled,
+	.icharger.set_charger_enable = pm8921_charger_enable,
+	.icharger.set_pwrsrc_enable = pm8921_pwrsrc_enable,
+	.icharger.set_pwrsrc_and_charger_enable =
+						pm8921_set_pwrsrc_and_charger_enable,
+	.icharger.set_limit_charge_enable = pm8921_limit_charge_enable,
+	.icharger.is_ovp = pm8921_is_charger_ovp,
+	.icharger.is_batt_temp_fault_disable_chg =
+						pm8921_is_batt_temp_fault_disable_chg,
+	.icharger.charger_change_notifier_register =
+						cable_detect_register_notifier,
+	.icharger.dump_all = pm8921_dump_all,
+	.icharger.get_attr_text = pm8921_charger_get_attr_text,
+	.icharger.max_input_current =pm8921_set_hsml_target_ma,
+	.icharger.is_safty_timer_timeout = pm8921_is_chg_safety_timer_timeout,
+	.icharger.is_battery_full_eoc_stop = pm8921_is_batt_full_eoc_stop,
+
+	/* gauge */
+	.igauge.name = "pm8921",
+	.igauge.get_battery_voltage = pm8921_get_batt_voltage,
+	.igauge.get_battery_current = pm8921_bms_get_batt_current,
+	.igauge.get_battery_temperature = pm8921_get_batt_temperature,
+	.igauge.get_battery_id = pm8921_get_batt_id,
+	.igauge.get_battery_soc = pm8921_bms_get_batt_soc,
+	.igauge.get_battery_cc = pm8921_bms_get_batt_cc,
+	.igauge.is_battery_temp_fault = pm8921_is_batt_temperature_fault,
+	.igauge.is_battery_full = pm8921_is_batt_full,
+	.igauge.get_attr_text = pm8921_gauge_get_attr_text,
+	.igauge.register_lower_voltage_alarm_notifier =
+						pm8xxx_batt_lower_alarm_register_notifier,
+	.igauge.enable_lower_voltage_alarm = pm8xxx_batt_lower_alarm_enable,
+	.igauge.set_lower_voltage_alarm_threshold =
+						pm8xxx_batt_lower_alarm_threshold_set,
+	
+#ifdef CONFIG_HTC_PNPMGR
+	.notify_pnpmgr_charging_enabled = pnpmgr_battery_charging_enabled,
+#endif 
+};
+
+static struct platform_device htc_battery_pdev = {
+	.name = "htc_battery",
+	.id = -1,
+	.dev    = {
+	.platform_data = &htc_battery_pdev_data,
+	},
+};
+#endif /* CONFIG_HTC_BATT_8960 */
 
 static struct atmel_i2c_platform_data ts_atmel_data[] = {
 	{
@@ -1261,322 +1602,6 @@ static struct attribute_group properties_attr_group = {
 	.attrs = properties_attrs,
 };
 
-#if 0
-static bool dsi_power_on;
-
-/**
- * LiQUID panel on/off
- *
- * @param on
- *
- * @return int
- */
-static int mipi_dsi_liquid_panel_power(int on)
-{
-	static struct regulator *reg_l2, *reg_ext_3p3v;
-	static int gpio21, gpio24, gpio43;
-	int rc;
-
-	pr_info("%s: on=%d\n", __func__, on);
-
-	gpio21 = PM8921_GPIO_PM_TO_SYS(21); /* disp power enable_n */
-	gpio43 = PM8921_GPIO_PM_TO_SYS(43); /* Displays Enable (rst_n)*/
-	gpio24 = PM8921_GPIO_PM_TO_SYS(24); /* Backlight PWM */
-
-	if (!dsi_power_on) {
-
-		reg_l2 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vdda");
-		if (IS_ERR(reg_l2)) {
-			pr_err("could not get 8921_l2, rc = %ld\n",
-				PTR_ERR(reg_l2));
-			return -ENODEV;
-		}
-
-		rc = regulator_set_voltage(reg_l2, 1200000, 1200000);
-		if (rc) {
-			pr_err("set_voltage l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-
-		reg_ext_3p3v = regulator_get(&msm_mipi_dsi1_device.dev,
-			"vdd_lvds_3p3v");
-		if (IS_ERR(reg_ext_3p3v)) {
-			pr_err("could not get reg_ext_3p3v, rc = %ld\n",
-			       PTR_ERR(reg_ext_3p3v));
-		    return -ENODEV;
-		}
-
-		rc = gpio_request(gpio21, "disp_pwr_en_n");
-		if (rc) {
-			pr_err("request gpio 21 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		rc = gpio_request(gpio43, "disp_rst_n");
-		if (rc) {
-			pr_err("request gpio 43 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		rc = gpio_request(gpio24, "disp_backlight_pwm");
-		if (rc) {
-			pr_err("request gpio 24 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		dsi_power_on = true;
-	}
-
-	if (on) {
-		rc = regulator_set_optimum_mode(reg_l2, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_enable(reg_l2);
-		if (rc) {
-			pr_err("enable l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		rc = regulator_enable(reg_ext_3p3v);
-		if (rc) {
-			pr_err("enable reg_ext_3p3v failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		/* set reset pin before power enable */
-		gpio_set_value_cansleep(gpio43, 0); /* disp disable (resx=0) */
-
-		gpio_set_value_cansleep(gpio21, 0); /* disp power enable_n */
-		msleep(20);
-		gpio_set_value_cansleep(gpio43, 1); /* disp enable */
-		msleep(20);
-		gpio_set_value_cansleep(gpio43, 0); /* disp enable */
-		msleep(20);
-		gpio_set_value_cansleep(gpio43, 1); /* disp enable */
-		msleep(20);
-	} else {
-		gpio_set_value_cansleep(gpio43, 0);
-		gpio_set_value_cansleep(gpio21, 1);
-
-		rc = regulator_disable(reg_l2);
-		if (rc) {
-			pr_err("disable reg_l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_disable(reg_ext_3p3v);
-		if (rc) {
-			pr_err("disable reg_ext_3p3v failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_set_optimum_mode(reg_l2, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
-static int mipi_dsi_cdp_panel_power(int on)
-{
-	static struct regulator *reg_l8, *reg_l23, *reg_l2;
-	static int gpio43;
-	int rc;
-
-	pr_info("%s: state : %d\n", __func__, on);
-
-	if (!dsi_power_on) {
-
-		reg_l8 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vdc");
-		if (IS_ERR(reg_l8)) {
-			pr_err("could not get 8921_l8, rc = %ld\n",
-				PTR_ERR(reg_l8));
-			return -ENODEV;
-		}
-		reg_l23 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vddio");
-		if (IS_ERR(reg_l23)) {
-			pr_err("could not get 8921_l23, rc = %ld\n",
-				PTR_ERR(reg_l23));
-			return -ENODEV;
-		}
-		reg_l2 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vdda");
-		if (IS_ERR(reg_l2)) {
-			pr_err("could not get 8921_l2, rc = %ld\n",
-				PTR_ERR(reg_l2));
-			return -ENODEV;
-		}
-		rc = regulator_set_voltage(reg_l8, 2800000, 3000000);
-		if (rc) {
-			pr_err("set_voltage l8 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_voltage(reg_l23, 1800000, 1800000);
-		if (rc) {
-			pr_err("set_voltage l23 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_voltage(reg_l2, 1200000, 1200000);
-		if (rc) {
-			pr_err("set_voltage l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		gpio43 = PM8921_GPIO_PM_TO_SYS(43);
-		rc = gpio_request(gpio43, "disp_rst_n");
-		if (rc) {
-			pr_err("request gpio 43 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		dsi_power_on = true;
-	}
-	if (on) {
-		rc = regulator_set_optimum_mode(reg_l8, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l8 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l23, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l2, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_enable(reg_l8);
-		if (rc) {
-			pr_err("enable l8 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_enable(reg_l23);
-		if (rc) {
-			pr_err("enable l8 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_enable(reg_l2);
-		if (rc) {
-			pr_err("enable l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		gpio_set_value_cansleep(gpio43, 1);
-	} else {
-		rc = regulator_disable(reg_l2);
-		if (rc) {
-			pr_err("disable reg_l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_disable(reg_l8);
-		if (rc) {
-			pr_err("disable reg_l8 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_disable(reg_l23);
-		if (rc) {
-			pr_err("disable reg_l23 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_set_optimum_mode(reg_l8, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l8 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l23, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l2, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		gpio_set_value_cansleep(gpio43, 0);
-	}
-	return 0;
-}
-#endif
-
-#if 0
-static int mipi_dsi_panel_power(int on)
-{
-	int ret;
-
-	pr_info("%s: on=%d\n", __func__, on);
-
-	if (machine_is_msm8960_liquid())
-		ret = mipi_dsi_liquid_panel_power(on);
-	else
-		ret = mipi_dsi_cdp_panel_power(on);
-
-	return ret;
-}
-
-static struct mipi_dsi_platform_data mipi_dsi_pdata = {
-	.vsync_gpio = MDP_VSYNC_GPIO,
-	.dsi_power_save = mipi_dsi_panel_power,
-};
-#endif
-
-#ifdef CONFIG_HTC_BATT_8960
-static struct htc_battery_platform_data htc_battery_pdev_data = {
-	/* param */
-	.guage_driver = 0,
-	.chg_limit_active_mask = HTC_BATT_CHG_LIMIT_BIT_TALK |
-								HTC_BATT_CHG_LIMIT_BIT_NAVI,
-	.critical_low_voltage_mv = 3100,
-	.critical_alarm_voltage_mv = 3000,
-	.overload_vol_thr_mv = 4000,
-	.overload_curr_thr_ma = 0,
-	/* charger */
-	.icharger.name = "pm8921",
-	.icharger.get_charging_source = pm8921_get_charging_source,
-	.icharger.get_charging_enabled = pm8921_get_charging_enabled,
-	.icharger.set_charger_enable = pm8921_charger_enable,
-	.icharger.set_pwrsrc_enable = pm8921_pwrsrc_enable,
-	.icharger.set_pwrsrc_and_charger_enable =
-						pm8921_set_pwrsrc_and_charger_enable,
-	.icharger.set_limit_charge_enable = pm8921_limit_charge_enable,
-	.icharger.is_ovp = pm8921_is_charger_ovp,
-	.icharger.is_batt_temp_fault_disable_chg =
-						pm8921_is_batt_temp_fault_disable_chg,
-	.icharger.charger_change_notifier_register =
-						cable_detect_register_notifier,
-	.icharger.dump_all = pm8921_dump_all,
-	.icharger.get_attr_text = pm8921_charger_get_attr_text,
-	/* gauge */
-	.igauge.name = "pm8921",
-	.igauge.get_battery_voltage = pm8921_get_batt_voltage,
-	.igauge.get_battery_current = pm8921_bms_get_batt_current,
-	.igauge.get_battery_temperature = pm8921_get_batt_temperature,
-	.igauge.get_battery_id = pm8921_get_batt_id,
-	.igauge.get_battery_soc = pm8921_bms_get_batt_soc,
-	.igauge.get_battery_cc = pm8921_bms_get_batt_cc,
-	.igauge.is_battery_temp_fault = pm8921_is_batt_temperature_fault,
-	.igauge.is_battery_full = pm8921_is_batt_full,
-	.igauge.get_attr_text = pm8921_gauge_get_attr_text,
-	.igauge.register_lower_voltage_alarm_notifier =
-						pm8xxx_batt_lower_alarm_register_notifier,
-	.igauge.enable_lower_voltage_alarm = pm8xxx_batt_lower_alarm_enable,
-	.igauge.set_lower_voltage_alarm_threshold =
-						pm8xxx_batt_lower_alarm_threshold_set,
-};
-
-static struct platform_device htc_battery_pdev = {
-	.name = "htc_battery",
-	.id = -1,
-	.dev    = {
-	.platform_data = &htc_battery_pdev_data,
-	},
-};
-#endif /* CONFIG_HTC_BATT_8960 */
 
 #if 0
 #define LPM_CHANNEL0 0
@@ -1867,6 +1892,11 @@ static void headset_device_register(void)
 	pr_info("[HS_BOARD] (%s) Headset device register (system_rev=%d)\n",
 		__func__, system_rev);
 
+	
+	if (system_rev >= 1)
+		htc_headset_pmic_data.key_gpio = PM8921_GPIO_PM_TO_SYS(
+			FIGHTER_PMGPIO_HS_TX_PMIC_REMO);
+
 	platform_device_register(&htc_headset_mgr);
 }
 
@@ -1894,7 +1924,6 @@ static struct resource hdmi_msm_resources[] = {
 
 static int hdmi_enable_5v(int on);
 static int hdmi_core_power(int on, int show);
-static int hdmi_cec_power(int on);
 
 static mhl_driving_params fighter_driving_params[] = {
 	{.format = HDMI_VFRMT_640x480p60_4_3,	.reg_a3=0xEC, .reg_a6=0x0C},
@@ -1910,7 +1939,6 @@ static struct msm_hdmi_platform_data hdmi_msm_data = {
 	.irq = HDMI_IRQ,
 	.enable_5v = hdmi_enable_5v,
 	.core_power = hdmi_core_power,
-	.cec_power = hdmi_cec_power,
 
 	.driving_params =  fighter_driving_params,
 	.dirving_params_count = ARRAY_SIZE(fighter_driving_params),
@@ -1928,17 +1956,11 @@ static struct platform_device hdmi_msm_device = {
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static int hdmi_enable_5v(int on)
 {
-	/* TBD: PM8921 regulator instead of 8901 */
-	static struct regulator *reg_8921_hdmi_mvs;	/* HDMI_5V */
 	static int prev_on;
 	int rc;
 
 	if (on == prev_on)
 		return 0;
-
-	if (!reg_8921_hdmi_mvs)
-		reg_8921_hdmi_mvs = regulator_get(&hdmi_msm_device.dev,
-			"hdmi_mvs");
 
 	if (on) {
 		rc = gpio_request(FIGHTER_GPIO_V_BOOST_5V_EN, "HDMI_BOOST_5V");
@@ -1964,14 +1986,13 @@ error:
 
 static int hdmi_core_power(int on, int show)
 {
-	static struct regulator *reg_8921_l23, *reg_8921_s4;
+	static struct regulator *reg_8921_l23;
 	static int prev_on;
 	int rc;
 
 	if (on == prev_on)
 		return 0;
 
-	/* TBD: PM8921 regulator instead of 8901 */
 	if (!reg_8921_l23) {
 		reg_8921_l23 = regulator_get(&hdmi_msm_device.dev, "hdmi_avdd");
 		if (IS_ERR(reg_8921_l23)) {
@@ -1985,20 +2006,6 @@ static int hdmi_core_power(int on, int show)
 			return -EINVAL;
 		}
 	}
-	if (!reg_8921_s4) {
-		reg_8921_s4 = regulator_get(&hdmi_msm_device.dev, "hdmi_vcc");
-		if (IS_ERR(reg_8921_s4)) {
-			pr_err("could not get reg_8921_s4, rc = %ld\n",
-				PTR_ERR(reg_8921_s4));
-			return -ENODEV;
-		}
-		rc = regulator_set_voltage(reg_8921_s4, 1800000, 1800000);
-		if (rc) {
-			pr_err("set_voltage failed for 8921_s4, rc=%d\n", rc);
-			return -EINVAL;
-		}
-	}
-
 	if (on) {
 		rc = regulator_set_optimum_mode(reg_8921_l23, 100000);
 		if (rc < 0) {
@@ -2011,97 +2018,27 @@ static int hdmi_core_power(int on, int show)
 				"hdmi_avdd", rc);
 			return rc;
 		}
-		rc = regulator_enable(reg_8921_s4);
-		if (rc) {
-			pr_err("'%s' regulator enable failed, rc=%d\n",
-				"hdmi_vcc", rc);
-			return rc;
-		}
 
-		rc = gpio_request(100, "HDMI_DDC_CLK");
-		if (rc) {
-			pr_err("'%s'(%d) gpio_request failed, rc=%d\n",
-				"HDMI_DDC_CLK", 100, rc);
-			goto error1;
-		}
-		rc = gpio_request(101, "HDMI_DDC_DATA");
-		if (rc) {
-			pr_err("'%s'(%d) gpio_request failed, rc=%d\n",
-				"HDMI_DDC_DATA", 101, rc);
-			goto error2;
-		}
-		rc = gpio_request(102, "HDMI_HPD");
-		if (rc) {
-			pr_err("'%s'(%d) gpio_request failed, rc=%d\n",
-				"HDMI_HPD", 102, rc);
-			goto error3;
-		}
-		pr_debug("%s(on): success\n", __func__);
+		pr_info("%s(on): success\n", __func__);
 	} else {
-		gpio_free(100);
-		gpio_free(101);
-		gpio_free(102);
-
 		rc = regulator_disable(reg_8921_l23);
 		if (rc) {
 			pr_err("disable reg_8921_l23 failed, rc=%d\n", rc);
 			return -ENODEV;
 		}
-		rc = regulator_disable(reg_8921_s4);
-		if (rc) {
-			pr_err("disable reg_8921_s4 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
+
 		rc = regulator_set_optimum_mode(reg_8921_l23, 100);
 		if (rc < 0) {
 			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
 			return -EINVAL;
 		}
-		pr_debug("%s(off): success\n", __func__);
+		pr_info("%s(off): success\n", __func__);
 	}
-
 	prev_on = on;
-
-	return 0;
-
-error3:
-	gpio_free(101);
-error2:
-	gpio_free(100);
-error1:
-	regulator_disable(reg_8921_l23);
-	regulator_disable(reg_8921_s4);
-	return rc;
-}
-
-static int hdmi_cec_power(int on)
-{
-	static int prev_on;
-	int rc;
-
-	if (on == prev_on)
-		return 0;
-
-	if (on) {
-		rc = gpio_request(99, "HDMI_CEC_VAR");
-		if (rc) {
-			pr_err("'%s'(%d) gpio_request failed, rc=%d\n",
-				"HDMI_CEC_VAR", 99, rc);
-			goto error;
-		}
-		pr_debug("%s(on): success\n", __func__);
-	} else {
-		gpio_free(99);
-		pr_debug("%s(off): success\n", __func__);
-	}
-
-	prev_on = on;
-
-	return 0;
-error:
 	return rc;
 }
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
+
 
 #define _GET_REGULATOR(var, name) do {				\
 	var = regulator_get(NULL, name);			\
@@ -2156,150 +2093,10 @@ static void fighter_usb_dpdn_switch(int path)
 		break;
 	}
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+	#ifdef CONFIG_FB_MSM_HDMI_MHL
 	sii9234_change_usb_owner((path == PATH_MHL) ? 1 : 0);
-#endif
+	#endif 
 }
-
-#ifdef CONFIG_FB_MSM_HDMI_MHL
-static struct regulator *reg_8921_l12;
-static struct regulator *reg_8921_s4;
-static struct regulator *reg_8921_l16;
-static struct regulator *reg_8921_l10;
-static struct regulator *reg_8921_s2;
-
-static int mhl_sii9234_power_vote(bool enable)
-{
-	int rc;
-
-	if (!reg_8921_l10) {
-		_GET_REGULATOR(reg_8921_l10, "8921_l10");
-		rc = regulator_set_voltage(reg_8921_l10, 3000000, 3000000);
-                if (rc) {
-                        pr_err("%s: regulator_set_voltage reg_8921_l10 failed rc=%d\n",
-                                __func__, rc);
-                        return rc;
-                }
-	}
-	if (!reg_8921_s2) {
-		_GET_REGULATOR(reg_8921_s2, "8921_s2");
-                rc = regulator_set_voltage(reg_8921_s2, 1300000, 1300000);
-                if (rc) {
-                        pr_err("%s: regulator_set_voltage reg_8921_s2 failed rc=%d\n",
-                                __func__, rc);
-                        return rc;
-                }
-
-	}
-
-	if (enable) {
-                if (reg_8921_l10) {
-                        rc = regulator_enable(reg_8921_l10);
-                        if (rc)
-                                pr_warning("'%s' regulator enable failed, rc=%d\n",
-                                        "reg_8921_l10", rc);
-                }
-                if (reg_8921_s2) {
-                        rc = regulator_enable(reg_8921_s2);
-                        if (rc)
-                                pr_warning("'%s' regulator enable failed, rc=%d\n",
-                                        "reg_8921_s2", rc);
-                }
-		pr_info("%s(on): success\n", __func__);
-	} else {
-		if (reg_8921_l10) {
-			rc = regulator_disable(reg_8921_l10);
-			if (rc)
-				pr_warning("'%s' regulator disable failed, rc=%d\n",
-					"reg_8921_l10", rc);
-		}
-		if (reg_8921_s2) {
-			rc = regulator_disable(reg_8921_s2);
-			if (rc)
-				pr_warning("'%s' regulator disable failed, rc=%d\n",
-					"reg_8921_s2", rc);
-		}
-		pr_info("%s(off): success\n", __func__);
-	}
-	return 0;
-}
-
-static int mhl_sii9234_all_power(bool enable)
-{
-	static bool prev_on;
-	int rc;
-	if (enable == prev_on)
-		return 0;
-
-	if (!reg_8921_s4)
-		_GET_REGULATOR(reg_8921_s4, "8921_s4");
-	if (!reg_8921_l16)
-		_GET_REGULATOR(reg_8921_l16, "8921_l16");
-	if (!reg_8921_l12)
-		_GET_REGULATOR(reg_8921_l12, "8921_l12");
-
-	if (enable) {
-		rc = regulator_set_voltage(reg_8921_s4, 1800000, 1800000);
-		if (rc) {
-			pr_err("%s: regulator_set_voltage reg_8921_s4 failed rc=%d\n",
-				__func__, rc);
-			return rc;
-		}
-		rc = regulator_set_voltage(reg_8921_l16, 3300000, 3300000);
-		if (rc) {
-			pr_err("%s: regulator_set_voltage reg_8921_l16 failed rc=%d\n",
-				__func__, rc);
-			return rc;
-		}
-
-		rc = regulator_set_voltage(reg_8921_l12, 1200000, 1200000);
-		if (rc) {
-			pr_err("%s: regulator_set_voltage reg_8921_l12 failed rc=%d\n",
-				__func__, rc);
-			return rc;
-		}
-		rc = regulator_enable(reg_8921_s4);
-
-		if (rc) {
-			pr_err("'%s' regulator enable failed, rc=%d\n",
-				"reg_8921_s4", rc);
-			return rc;
-		}
-		rc = regulator_enable(reg_8921_l16);
-		if (rc) {
-			pr_err("'%s' regulator enable failed, rc=%d\n",
-				"reg_8921_l16", rc);
-			return rc;
-		}
-
-		rc = regulator_enable(reg_8921_l12);
-		if (rc) {
-			pr_err("'%s' regulator enable failed, rc=%d\n",
-				"reg_8921_l12", rc);
-			return rc;
-		}
-		pr_info("%s(on): success\n", __func__);
-	} else {
-		rc = regulator_disable(reg_8921_s4);
-		if (rc)
-			pr_warning("'%s' regulator disable failed, rc=%d\n",
-				"reg_8921_s4", rc);
-		rc = regulator_disable(reg_8921_l16);
-		if (rc)
-			pr_warning("'%s' regulator disable failed, rc=%d\n",
-				"reg_8921_l16", rc);
-		rc = regulator_disable(reg_8921_l12);
-		if (rc)
-			pr_warning("'%s' regulator disable failed, rc=%d\n",
-				"reg_8921_l12", rc);
-		pr_info("%s(off): success\n", __func__);
-	}
-
-	prev_on = enable;
-
-	return 0;
-}
-#endif
 
 #ifdef CONFIG_WCD9310_CODEC
 
@@ -3008,10 +2805,11 @@ static struct msm_bus_scale_pdata usb_bus_scale_pdata = {
 	.name = "usb",
 };
 
-static int fighter_phy_init_seq[] = { 0x7f, 0x81, 0x3c, 0x82, -1};
+static int phy_init_seq_v3[] = { 0x7f, 0x81, 0x3c, 0x82, -1};
+static int phy_init_seq_v3_2_1[] = { 0x5f, 0x81, 0x3c, 0x82, -1};
 
 static struct msm_otg_platform_data msm_otg_pdata = {
-	.phy_init_seq		= fighter_phy_init_seq,
+	.phy_init_seq		= phy_init_seq_v3,
 	.mode			= USB_OTG,
 	.otg_control		= OTG_PMIC_CONTROL,
 	.phy_type		= SNPS_28NM_INTEGRATED_PHY,
@@ -3136,7 +2934,8 @@ static struct android_usb_platform_data android_usb_pdata = {
 	.functions = usb_functions_all,
 	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
 	.usb_id_pin_gpio = FIGHTER_GPIO_USB_ID1,
-	.usb_rmnet_interface = "smd,bam",
+	.usb_diag_interface = "diag",
+	.usb_rmnet_interface = "smd:bam",
 	.fserial_init_string = "smd:modem,tty,tty:autobot,tty:serial,tty:autobot",
 	.nluns = 2,
 #ifdef CONFIG_USB_GADGET_VERIZON_PRODUCT_ID
@@ -3156,9 +2955,13 @@ static struct platform_device android_usb_device = {
 #define HW_8960_V3_2_1   0x07
 void fighter_add_usb_devices(void)
 {
-	printk(KERN_INFO "%s rev: %d\n", __func__, system_rev);
-	msm_otg_pdata.phy_init_seq = fighter_phy_init_seq;
-
+	if (VERSION_ID >= HW_8960_V3_2_1) {
+		printk(KERN_INFO "%s rev: %d v3.2.1\n", __func__, system_rev);
+		msm_otg_pdata.phy_init_seq = phy_init_seq_v3_2_1;
+	} else {
+		printk(KERN_INFO "%s rev: %d\n", __func__, system_rev);
+		msm_otg_pdata.phy_init_seq = phy_init_seq_v3;
+	}
 	android_usb_pdata.products[0].product_id =
 			android_usb_pdata.product_id;
 
@@ -3183,6 +2986,7 @@ void fighter_add_usb_devices(void)
 	printk(KERN_INFO "%s: OTG_PMIC_CONTROL in rev: %d\n",
 			__func__, system_rev);
 }
+
 
 static uint8_t spm_wfi_cmd_sequence[] __initdata = {
 			0x03, 0x0f,
@@ -3252,38 +3056,6 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.modes = msm_spm_seq_list,
 	},
 };
-
-#ifdef CONFIG_PERFLOCK
-static unsigned fighter_perf_acpu_table[] = {
-	594000000, /* LOWEST */
-	810000000, /* LOW */
-	1026000000, /* MEDIUM */
-	1242000000,/* HIGH */
-	1458000000, /* HIGHEST */
-};
-
-static struct perflock_data fighter_perflock_data = {
-	.perf_acpu_table = fighter_perf_acpu_table,
-	.table_size = ARRAY_SIZE(fighter_perf_acpu_table),
-};
-
-static struct perflock_data fighter_cpufreq_ceiling_data = {
-	.perf_acpu_table = fighter_perf_acpu_table,
-	.table_size = ARRAY_SIZE(fighter_perf_acpu_table),
-};
-static struct perflock_pdata perflock_pdata = {
-       .perf_floor = &fighter_perflock_data,
-       .perf_ceiling = &fighter_cpufreq_ceiling_data,
-};
-
-struct platform_device msm8960_device_perf_lock = {
-       .name = "perf_lock",
-       .id = -1,
-       .dev = {
-               .platform_data = &perflock_pdata,
-       },
-};
-#endif
 
 static uint8_t l2_spm_wfi_cmd_sequence[] __initdata = {
 			0x00, 0x20, 0x03, 0x20,
@@ -3652,11 +3424,6 @@ static struct platform_device *fighter_devices[] __initdata = {
 	&msm_cpudai_auxpcm_tx,
 	&msm_cpu_fe,
 	&msm_stub_codec,
-	&msm_kgsl_3d0,
-#ifdef CONFIG_MSM_KGSL_2D
-	&msm_kgsl_2d0,
-	&msm_kgsl_2d1,
-#endif
 #ifdef CONFIG_MSM_GEMINI
 	&msm8960_gemini_device,
 #endif
@@ -3705,13 +3472,33 @@ static void __init msm8960_i2c_init(void)
 
 static void __init msm8960_gfx_init(void)
 {
+	struct kgsl_device_platform_data *kgsl_3d0_pdata =
+		msm_kgsl_3d0.dev.platform_data;
 	uint32_t soc_platform_version = socinfo_get_version();
-	if (SOCINFO_VERSION_MAJOR(soc_platform_version) == 1) {
-		struct kgsl_device_platform_data *kgsl_3d0_pdata =
-				msm_kgsl_3d0.dev.platform_data;
-		kgsl_3d0_pdata->pwrlevel[0].gpu_freq = 320000000;
-		kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 266667000;
-		kgsl_3d0_pdata->nap_allowed = false;
+
+	
+	if (cpu_is_msm8960ab()) {
+		kgsl_3d0_pdata->chipid = ADRENO_CHIPID(3, 2, 1, 0);
+		
+		kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 320000000;
+	} else {
+		kgsl_3d0_pdata->iommu_count = 1;
+		if (SOCINFO_VERSION_MAJOR(soc_platform_version) == 1) {
+			kgsl_3d0_pdata->pwrlevel[0].gpu_freq = 320000000;
+			kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 266667000;
+		}
+		if (SOCINFO_VERSION_MAJOR(soc_platform_version) >= 3) {
+			kgsl_3d0_pdata->chipid = ADRENO_CHIPID(2, 2, 0, 6);
+		}
+	}
+
+	
+	platform_device_register(&msm_kgsl_3d0);
+
+	
+	if (!cpu_is_msm8960ab()) {
+		platform_device_register(&msm_kgsl_2d0);
+		platform_device_register(&msm_kgsl_2d1);
 	}
 }
 
@@ -4054,7 +3841,11 @@ static struct pm8xxx_mpp_platform_data pm8xxx_mpp_pdata __devinitdata = {
 
 static struct pm8xxx_rtc_platform_data pm8xxx_rtc_pdata __devinitdata = {
 	.rtc_write_enable       = true,
-	.rtc_alarm_powerup	= false,
+#ifdef CONFIG_HTC_OFFMODE_ALARM
+	.rtc_alarm_powerup      = true,
+#else
+	.rtc_alarm_powerup      = false,
+#endif
 };
 
 static struct pm8xxx_pwrkey_platform_data pm8xxx_pwrkey_pdata = {
@@ -4086,6 +3877,7 @@ static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
 	.cool_bat_voltage	= 4200,
 	.warm_bat_voltage	= 4000,
 	.mbat_in_gpio		= FIGHTER_GPIO_MBAT_IN,
+	.is_embeded_batt	= 1,
 	.thermal_mitigation	= pm8921_therm_mitigation,
 	.thermal_levels		= ARRAY_SIZE(pm8921_therm_mitigation),
 	.cold_thr = PM_SMBC_BATT_TEMP_COLD_THR__HIGH,
@@ -4105,6 +3897,11 @@ static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
 
 static int __init check_dq_setup(char *str)
 {
+	int i = 0;
+	int size = 0;
+
+	size = sizeof(chg_batt_params)/sizeof(chg_batt_params[0]);
+
 	if (!strcmp(str, "PASS")) {
 		pr_info("[BATT] overwrite HV battery config\n");
 		pm8921_chg_pdata.max_voltage = 4340;
@@ -4115,6 +3912,12 @@ static int __init check_dq_setup(char *str)
 		pm8921_chg_pdata.max_voltage = 4200;
 		pm8921_chg_pdata.cool_bat_voltage = 4200;
 		pm8921_bms_pdata.max_voltage_uv = 4200 * 1000;
+
+		for(i=0; i < size; i++)
+		{
+			chg_batt_params[i].max_voltage = 4200;
+			chg_batt_params[i].cool_bat_voltage = 4200;
+		}
 	}
 	return 1;
 }
@@ -4225,64 +4028,59 @@ static struct msm_rpmrs_level msm_rpmrs_levels[] = {
 		MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
-		100, 8000, 100000, 1,
+		1, 784, 180000, 100,
 	},
 #if 0
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
-		2000, 6000, 60100000, 3000,
+		1300, 228, 1200000, 2000,
 	},
 #endif
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, GDHS, MAX, ACTIVE),
 		false,
-		4600, 5000, 60350000, 3500,
+		2000, 138, 1208400, 3200,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
-		MSM_RPMRS_LIMITS(ON, HSFS_OPEN, MAX, ACTIVE),
-		false,
-		6700, 4500, 65350000, 4800,
-	},
-	{
-		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, HSFS_OPEN, ACTIVE, RET_HIGH),
 		false,
-		7400, 3500, 66600000, 5150,
+		6000, 119, 1850300, 9000,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, GDHS, MAX, ACTIVE),
 		false,
-		12100, 2500, 67850000, 5500,
+		9200, 68, 2839200, 16400,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, MAX, ACTIVE),
 		false,
-		14200, 2000, 71850000, 6800,
+		10300, 63, 3128000, 18200,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, ACTIVE, RET_HIGH),
 		false,
-		30100, 500, 75850000, 8800,
+		18000, 10, 4602600, 27000,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, RET_HIGH, RET_LOW),
 		false,
-		30100, 0, 76350000, 9800,
+		20000, 2, 5752000, 32000,
 	},
 };
+
 
 static struct msm_rpmrs_platform_data msm_rpmrs_data __initdata = {
 	.levels = &msm_rpmrs_levels[0],
@@ -4604,10 +4402,15 @@ static void __init fighter_init(void)
 	msm_clock_init(&msm8960_clock_init_data);
 
 	android_usb_pdata.swfi_latency = msm_rpm_get_swfi_latency();
+
 	msm8960_device_otg.dev.platform_data = &msm_otg_pdata;
 	fighter_gpiomux_init();
 	msm8960_device_qup_spi_gsbi10.dev.platform_data =
 				&msm8960_qup_spi_gsbi10_pdata;
+#ifdef CONFIG_RAWCHIP
+	spi_register_board_info(rawchip_spi_board_info,
+				ARRAY_SIZE(rawchip_spi_board_info));
+#endif
 	msm8960_device_ssbi_pmic.dev.platform_data =
 				&msm8960_ssbi_pm8921_pdata;
 	pm8921_platform_data.num_regulators = msm_pm8921_regulator_pdata_len;
@@ -4638,14 +4441,13 @@ static void __init fighter_init(void)
 		for (rc = 0; rc < ARRAY_SIZE(syn_ts_3k_data);  rc++)
 			syn_ts_3k_data[i].mfg_flag = 1;
 	}
+
 	register_i2c_devices();
 	msm8960_init_fb();
 	slim_register_board_info(msm_slim_devices,
 		ARRAY_SIZE(msm_slim_devices));
 
 	change_memory_power = &msm8960_change_memory_power;
-	create_proc_read_entry("emmc", 0, NULL, emmc_partition_read_proc, NULL);
-	create_proc_read_entry("dying_processes", 0, NULL, dying_processors_read_proc, NULL);
 
 #ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
 	if(!cpu_is_krait_v1())
@@ -4672,6 +4474,7 @@ static void __init fighter_init(void)
 		htc_monitor_init();
 		htc_pm_monitor_init();
 	}
+
 	msm_pm_init_sleep_status_data(&msm_pm_slp_sts_data);
 	msm_pm_radio_info_init(MSM_SHARED_RAM_BASE + 0x1F0000);
 }
