@@ -1730,10 +1730,10 @@ bool_t	Yushan_Context_Config_Update(Yushan_New_Context_Config_t	*sYushanNewConte
 		
 		sYushanNewContextConfig->bSelectStillVfMode = YUSHAN_FRAME_FORMAT_VF_MODE;
 	} else {
-		if (bCurrentStreamingMode == YUSHAN_FRAME_FORMAT_VF_MODE) {
+		
 		
 		sYushanNewContextConfig->bSelectStillVfMode = YUSHAN_FRAME_FORMAT_STILL_MODE;
-		}
+		
 	}
 
 	

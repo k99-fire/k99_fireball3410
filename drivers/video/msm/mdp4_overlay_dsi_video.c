@@ -37,6 +37,7 @@
 #include "mipi_dsi.h"
 
 #include <mach/iommu_domains.h>
+#include <mach/debug_display.h>
 
 #define DSI_VIDEO_BASE	0xE0000
 
@@ -47,6 +48,7 @@ static int dsi_video_enabled;
 
 #define MAX_CONTROLLER	1
 #define VSYNC_EXPIRE_TICK 1
+#define CONTINUOUS_SPLASH 1
 
 static struct vsycn_ctrl {
 	struct device *dev;
@@ -149,7 +151,7 @@ static void mdp4_dsi_video_blt_ov_update(struct mdp4_overlay_pipe *pipe);
 static void mdp4_dsi_video_wait4dmap(int cndx);
 static void mdp4_dsi_video_wait4ov(int cndx);
 
-int mdp4_dsi_video_pipe_commit(void)
+int mdp4_dsi_video_pipe_commit(int cndx, int wait)
 {
 
 	int  i, undx;
@@ -161,7 +163,7 @@ int mdp4_dsi_video_pipe_commit(void)
 	unsigned long flags;
 	int cnt = 0;
 
-	vctrl = &vsync_ctrl_db[0];
+	vctrl = &vsync_ctrl_db[cndx];
 
 	mutex_lock(&vctrl->update_lock);
 	undx =  vctrl->update_ndx;
@@ -245,6 +247,13 @@ int mdp4_dsi_video_pipe_commit(void)
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
 	mdp4_stat.overlay_commit[pipe->mixer_num]++;
+
+	if (wait) {
+		if (pipe->ov_blt_addr)
+			mdp4_dsi_video_wait4ov(cndx);
+		else
+			mdp4_dsi_video_wait4dmap(cndx);
+	}
 
 	return cnt;
 }
@@ -338,7 +347,6 @@ static void mdp4_dsi_video_wait4dmap_done(int cndx)
 	vsync_irq_enable(INTR_DMA_P_DONE, MDP_DMAP_TERM);
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 	mdp4_dsi_video_wait4dmap(cndx);
-	vsync_irq_disable(INTR_DMA_P_DONE, MDP_DMAP_TERM);
 }
 
 
@@ -359,13 +367,15 @@ static void mdp4_dsi_video_wait4ov(int cndx)
 	wait_for_completion(&vctrl->ov_comp);
 }
 
-static ssize_t vsync_show_event(struct device *dev,
+ssize_t mdp4_dsi_video_show_event(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	int cndx;
 	struct vsycn_ctrl *vctrl;
 	ssize_t ret = 0;
 	unsigned long flags;
+	int timeout = 0;
+	static int cnt = 0;
 
 	cndx = 0;
 	vctrl = &vsync_ctrl_db[0];
@@ -379,7 +389,15 @@ static ssize_t vsync_show_event(struct device *dev,
 	vctrl->wait_vsync_cnt++;
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
-	wait_for_completion(&vctrl->vsync_comp);
+	timeout = wait_for_completion_timeout(&vctrl->vsync_comp, HZ/20);
+
+	if (!timeout) {
+		if (cnt > 3)
+			PR_DISP_WARN("WARNING %s: vsync timeout\n", __func__);
+		cnt++;
+	} else
+		cnt = 0;
+
 
 	ret = snprintf(buf, PAGE_SIZE, "VSYNC=%llu",
 			ktime_to_ns(vctrl->vsync_time));
@@ -396,7 +414,7 @@ void mdp4_dsi_vsync_init(int cndx)
 		return;
 	}
 
-	pr_info("%s: ndx=%d\n", __func__, cndx);
+	pr_debug("%s: ndx=%d\n", __func__, cndx);
 
 	vctrl = &vsync_ctrl_db[cndx];
 	if (vctrl->inited)
@@ -408,7 +426,7 @@ void mdp4_dsi_vsync_init(int cndx)
 	init_completion(&vctrl->vsync_comp);
 	init_completion(&vctrl->dmap_comp);
 	init_completion(&vctrl->ov_comp);
-	atomic_set(&vctrl->suspend, 0);
+	atomic_set(&vctrl->suspend, 1);
 	spin_lock_init(&vctrl->spin_lock);
 }
 
@@ -424,17 +442,6 @@ void mdp4_dsi_video_base_swap(int cndx, struct mdp4_overlay_pipe *pipe)
 	vctrl = &vsync_ctrl_db[cndx];
 	vctrl->base_pipe = pipe;
 }
-
-static DEVICE_ATTR(vsync_event, S_IRUGO, vsync_show_event, NULL);
-
-static struct attribute *vsync_fs_attrs[] = {
-	&dev_attr_vsync_event.attr,
-	NULL,
-};
-
-static struct attribute_group vsync_fs_attr_group = {
-	.attrs = vsync_fs_attrs,
-};
 
 int mdp4_dsi_video_on(struct platform_device *pdev)
 {
@@ -553,17 +560,18 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 		mdelay(20);
 		mipi_dsi_controller_cfg(0);
+		mdp_clk_ctrl(0);
 	}
 #endif
 
-	pipe->src_height = fbi->var.yres;
-	pipe->src_width = fbi->var.xres;
-	pipe->src_h = fbi->var.yres;
-	pipe->src_w = fbi->var.xres;
+	pipe->src_height = mfd->ovr_dst_height;	
+	pipe->src_width = mfd->ovr_dst_width;	
+	pipe->src_h = mfd->ovr_src_height;	
+	pipe->src_w = mfd->ovr_src_width;	
 	pipe->src_y = 0;
 	pipe->src_x = 0;
-	pipe->dst_h = fbi->var.yres;
-	pipe->dst_w = fbi->var.xres;
+	pipe->dst_h = mfd->ovr_dst_height;	
+	pipe->dst_w = mfd->ovr_dst_width;	
 	pipe->srcp0_ystride = fbi->fix.line_length;
 	pipe->bpp = bpp;
 
@@ -572,8 +580,8 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	else
 		pipe->srcp0_addr = (uint32)(buf + buf_offset);
 
-	pipe->dst_h = fbi->var.yres;
-	pipe->dst_w = fbi->var.xres;
+	pipe->dst_h = mfd->ovr_dst_height;	
+	pipe->dst_w = mfd->ovr_dst_width;	
 
 	mdp4_overlay_mdp_pipe_req(pipe, mfd);
 
@@ -585,8 +593,10 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	mdp4_overlayproc_cfg(pipe);
 
 	mdp4_overlay_reg_flush(pipe, 1);
-	mdp4_mixer_stage_up(pipe);
+
+	mdp4_mixer_stage_up(pipe, 0);
 	mdp4_mixer_stage_commit(pipe->mixer_num);
+
 	h_back_porch = var->left_margin;
 	h_front_porch = var->right_margin;
 	v_back_porch = var->upper_margin;
@@ -635,6 +645,12 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 		active_v_end = 0;
 	}
 
+#ifdef CONFIG_FB_MSM_RESOLUTION_OVERRIDE
+	active_hctl = 0;
+	active_v_start = 0;
+	active_v_end = 0;
+#endif
+
 	dsi_underflow_clr |= 0x80000000;	
 	hsync_polarity = 0;
 	vsync_polarity = 0;
@@ -643,43 +659,24 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	ctrl_polarity =
 	    (data_en_polarity << 2) | (vsync_polarity << 1) | (hsync_polarity);
 
-	if ((mfd->cont_splash_done)) {
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x4, hsync_ctrl);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x8, vsync_period * hsync_period);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0xc,
-					vsync_pulse_width * hsync_period);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x10, display_hctl);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x14, display_v_start);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x18, display_v_end);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x1c, active_hctl);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x20, active_v_start);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x24, active_v_end);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x28, dsi_border_clr);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x2c, dsi_underflow_clr);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x30, dsi_hsync_skew);
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x38, ctrl_polarity);
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-	} else {
-		mfd->cont_splash_done = 1;
-		mdp_clk_ctrl(0);
-	}
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x4, hsync_ctrl);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x8, vsync_period * hsync_period);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0xc,
+				vsync_pulse_width * hsync_period);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x10, display_hctl);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x14, display_v_start);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x18, display_v_end);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x1c, active_hctl);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x20, active_v_start);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x24, active_v_end);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x28, dsi_border_clr);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x2c, dsi_underflow_clr);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x30, dsi_hsync_skew);
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x38, ctrl_polarity);
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	mdp_histogram_ctrl_all(TRUE);
-
-	if (!vctrl->sysfs_created) {
-		ret = sysfs_create_group(&vctrl->dev->kobj,
-			&vsync_fs_attr_group);
-		if (ret) {
-			pr_err("%s: sysfs group creation failed, ret=%d\n",
-				__func__, ret);
-			return ret;
-		}
-
-		kobject_uevent(&vctrl->dev->kobj, KOBJ_ADD);
-		pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
-		vctrl->sysfs_created = 1;
-	}
 
 	return ret;
 }
@@ -720,7 +717,7 @@ int mdp4_dsi_video_off(struct platform_device *pdev)
 			vctrl->base_pipe = NULL;
 		} else {
 			
-			mdp4_mixer_stage_down(vctrl->base_pipe);
+			mdp4_mixer_stage_down(vctrl->base_pipe, 1);
 			mdp4_overlay_iommu_pipe_free(
 				vctrl->base_pipe->pipe_ndx, 1);
 		}
@@ -786,12 +783,12 @@ void mdp4_dsi_video_3d_sbys(struct msm_fb_data_type *mfd,
 					pipe->src_width, bpp);
 	} else {
 		 
-		pipe->src_height = fbi->var.yres;
-		pipe->src_width = fbi->var.xres;
-		pipe->src_h = fbi->var.yres;
-		pipe->src_w = fbi->var.xres;
-		pipe->dst_h = fbi->var.yres;
-		pipe->dst_w = fbi->var.xres;
+		pipe->src_height = mfd->ovr_dst_height;	
+		pipe->src_width = mfd->ovr_dst_width;	
+		pipe->src_h = mfd->ovr_src_height;	
+		pipe->src_w = mfd->ovr_src_width;	
+		pipe->dst_h = mfd->ovr_dst_height;	
+		pipe->dst_w = mfd->ovr_dst_width;	
 		pipe->srcp0_ystride = fbi->fix.line_length;
 	}
 
@@ -815,7 +812,7 @@ void mdp4_dsi_video_3d_sbys(struct msm_fb_data_type *mfd,
 
 	mdp4_overlay_reg_flush(pipe, 1);
 
-	mdp4_mixer_stage_up(pipe);
+	mdp4_mixer_stage_up(pipe, 0);
 
 	mdp4_mixer_stage_commit(pipe->mixer_num);
 
@@ -1001,19 +998,23 @@ static void mdp4_dsi_video_do_blt(struct msm_fb_data_type *mfd, int enable)
 			mdp4_dsi_video_wait4dmap_done(0);
 			MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 			msleep(20);
-			mipi_dsi_controller_cfg(0);
 		}
 		mdp4_overlayproc_cfg(pipe);
 		mdp4_overlay_dmap_xy(pipe);
 		if (tg_enabled) {
 			if (pipe->ov_blt_addr) {
-				MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 1);
+				spin_lock_irqsave(&vctrl->spin_lock, flag);
+				pipe->ov_cnt++;
+				vctrl->ov_koff++;
+				
+				mdp4_stat.kickoff_ov0++;
+				INIT_COMPLETION(vctrl->ov_comp);
+				vsync_irq_enable(INTR_OVERLAY0_DONE, MDP_OVERLAY0_TERM);
 				outpdw(MDP_BASE + 0x0004, 0);
-				mdp4_dsi_video_wait4dmap_done(0);
-				MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
+				spin_unlock_irqrestore(&vctrl->spin_lock, flag);
+				mdp4_dsi_video_wait4ov(0);
 			}
 			mipi_dsi_sw_reset();
-			mipi_dsi_controller_cfg(1);
 			MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 1);
 		}
 		vctrl->blt_change = 0;
@@ -1070,12 +1071,12 @@ void mdp4_dsi_video_overlay(struct msm_fb_data_type *mfd)
 	mdp4_overlay_mdp_perf_upd(mfd, 1);
 
 	mutex_lock(&mfd->dma->ov_mutex);
-	mdp4_dsi_video_pipe_commit();
+	mdp4_dsi_video_pipe_commit(cndx, 0);
 
 	if (pipe->ov_blt_addr)
-		mdp4_dsi_video_wait4ov(0);
+		mdp4_dsi_video_wait4ov(cndx);
 	else
-		mdp4_dsi_video_wait4dmap(0);
+		mdp4_dsi_video_wait4dmap(cndx);
 
 	mdp4_overlay_mdp_perf_upd(mfd, 0);
 	mutex_unlock(&mfd->dma->ov_mutex);

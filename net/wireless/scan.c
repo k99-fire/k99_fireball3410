@@ -56,8 +56,11 @@ void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev, bool leak)
 
 	rdev->scan_req = NULL;
 
-	if (!leak)
+	if (!leak) {
+		
+		request->magic = 0;
 		kfree(request);
+	}
 }
 
 void __cfg80211_scan_done(struct work_struct *wk)

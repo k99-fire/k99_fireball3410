@@ -17,6 +17,7 @@
 
 #define DEV_DBG_PREFIX "EXT_COMMON: "
 
+#define SHOW_TV_NAME
 #define DBC_START_OFFSET 4
 
 #include "msm_fb.h"
@@ -689,6 +690,8 @@ static ssize_t hdmi_3d_rda_format_3d(struct device *dev,
 	return ret;
 }
 
+extern void send_hdmi_uevent(void);
+
 static ssize_t hdmi_3d_wta_format_3d(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -707,7 +710,9 @@ static ssize_t hdmi_3d_wta_format_3d(struct device *dev,
 				external_common_state->format_3d);
 		}
 	} else {
-		DEV_DBG("%s: '%d' (unknown)\n", __func__, format_3d);
+		DEV_INFO("%s: '%d' (notify ready)\n", __func__, format_3d);
+		
+		send_hdmi_uevent();
 	}
 
 	return ret;
@@ -1280,7 +1285,35 @@ static void hdmi_edid_extract_extended_data_blocks(const uint8 *in_buf)
 		etag = hdmi_edid_find_block(in_buf, start_offset, 7, &len);
 	}
 }
+#ifdef SHOW_TV_NAME
+static void hdmi_edid_monitor_desc(const uint8 *data_buf)
+{
+	int i;
+	uint8 data_type;
+	const uint8_t *desc_data;
+	uint8 monitor_name[14];
+	uint8 monitor_name_length;
 
+	data_type = data_buf[3];
+	desc_data = data_buf+5;
+	if( data_type == 0xFC || data_type == 0xFF ){
+		memset(monitor_name, 0, sizeof(monitor_name));
+		for (i = 12; i >= 0; i--)
+			if (desc_data[i] != 0x20 && desc_data[i] != 0x0A) {
+				monitor_name_length = i+1;
+				memcpy(monitor_name, desc_data, monitor_name_length);
+				DEV_INFO("%s: %s \"%s\"\n", __func__,
+					data_type==0xFC?"monitor name":"monitor S/N", monitor_name);
+				break;
+			}
+		if (i < 0) {
+			DEV_ERR("%s: monitor name descriptor is empty\n", __func__);
+			monitor_name_length = 0;
+		}
+	}
+	return;
+}
+#endif
 static void hdmi_edid_detail_desc(const uint8 *data_buf, uint32 *disp_mode)
 {
 	boolean	aspect_ratio_4_3    = FALSE;
@@ -1293,6 +1326,12 @@ static void hdmi_edid_detail_desc(const uint8 *data_buf, uint32 *disp_mode)
 	uint32	max_num_of_elements = 0;
 	uint32	img_size_h          = 0;
 	uint32	img_size_v          = 0;
+
+	if (data_buf[0] == 0 && data_buf[0+1] == 0)
+		if (data_buf[2] == 0)
+			hdmi_edid_monitor_desc(data_buf);
+	if (disp_mode == NULL)
+		return;
 
 	
 	active_h = ((((uint32)data_buf[0x4] >> 0x4) & 0xF) << 8)
@@ -1382,7 +1421,29 @@ static void add_supported_video_format(
 			disp_mode_list->num_of_elements++] = video_format;
 	}
 }
+#ifdef SHOW_TV_NAME
+static void hdmi_edid_dtd_block(int block, const uint8 *data_buf)
+{
+	int i = 0;
+	int nDTD;
+	int desc_offset;
 
+	if (!block) {
+		desc_offset = 0x36;
+		nDTD = 4;
+	} else {
+		desc_offset = 0x80 + data_buf[0x82];
+		nDTD = data_buf[0x83] & 0x0F;
+	}
+
+	while (nDTD > i) {
+		hdmi_edid_detail_desc(data_buf + desc_offset,
+			(uint32_t *) NULL);
+		desc_offset += 0x12;
+		++i;
+	}
+}
+#endif
 const char *single_video_3d_format_2string(uint32 format)
 {
 	switch (format) {
@@ -1619,10 +1680,18 @@ static void hdmi_edid_get_display_mode(const uint8 *data_buf,
 			if (video_format == HDMI_VFRMT_640x480p60_4_3)
 				has480p = TRUE;
 		}
+#ifdef SHOW_TV_NAME
+		hdmi_edid_dtd_block(0, data_buf);
+		hdmi_edid_dtd_block(1, data_buf);
+#endif
 	} else if (!num_og_cea_blocks) {
 		
 		uint32 desc_offset = 0;
+#ifdef SHOW_TV_NAME
+		while (4 > i) {
+#else
 		while (4 > i && 0 != edid_blk0[0x36+desc_offset]) {
+#endif
 			hdmi_edid_detail_desc(edid_blk0+0x36+desc_offset,
 				&video_format);
 			DEV_DBG("[%s:%d] Block-0 Adding vid fmt = [%s]\n",
@@ -1665,7 +1734,13 @@ static void hdmi_edid_get_display_mode(const uint8 *data_buf,
 
 		 
 		desc_offset = edid_blk1[0x02];
+
+#ifdef SHOW_TV_NAME
+		i = 0;
+		while (i < (edid_blk1[0x03] & 0x0F)) {
+#else
 		while (0 != edid_blk1[desc_offset]) {
+#endif
 			hdmi_edid_detail_desc(edid_blk1+desc_offset,
 				&video_format);
 			DEV_DBG("[%s:%d] Block-1 Adding vid fmt = [%s]\n",

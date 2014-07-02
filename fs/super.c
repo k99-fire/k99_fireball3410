@@ -35,6 +35,7 @@
 #include <linux/fsnotify.h>
 #include "internal.h"
 
+atomic_t vfs_emergency_remount;
 
 LIST_HEAD(super_blocks);
 DEFINE_SPINLOCK(sb_lock);
@@ -586,10 +587,15 @@ cancel_readonly:
 	return retval;
 }
 
+char devlog_part[64] = {0,};
 static void do_emergency_remount(struct work_struct *work)
 {
 	struct super_block *sb, *p = NULL;
+	char b[BDEVNAME_SIZE];
 
+	atomic_set(&vfs_emergency_remount, 1);
+	
+	umount2("/devlog", MNT_DETACH);
 	spin_lock(&sb_lock);
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (hlist_unhashed(&sb->s_instances))
@@ -599,7 +605,9 @@ static void do_emergency_remount(struct work_struct *work)
 		down_write(&sb->s_umount);
 		if (sb->s_root && sb->s_bdev && (sb->s_flags & MS_BORN) &&
 		    !(sb->s_flags & MS_RDONLY)) {
-			do_remount_sb(sb, MS_RDONLY, NULL, 1);
+			
+			if (strcmp(bdevname(sb->s_bdev, b), devlog_part))
+				do_remount_sb(sb, MS_RDONLY, NULL, 1);
 		}
 		up_write(&sb->s_umount);
 		spin_lock(&sb_lock);
@@ -611,7 +619,7 @@ static void do_emergency_remount(struct work_struct *work)
 		__put_super(p);
 	spin_unlock(&sb_lock);
 	kfree(work);
-	atomic_set(&emmc_reboot, 1);
+	atomic_set(&vfs_emergency_remount, 0);
 	printk("Lock eMMC\n");
 	printk("Emergency Remount complete\n");
 }

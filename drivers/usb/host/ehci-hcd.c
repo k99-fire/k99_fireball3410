@@ -682,7 +682,7 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			status, masked_status, pcd_status = 0, cmd;
-	int			bh;
+	int			bh = 0;
 
 	spin_lock (&ehci->lock);
 
@@ -788,6 +788,8 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 	
 	if (unlikely ((status & STS_FATAL) != 0)) {
 		ehci_err(ehci, "fatal error\n");
+		if (hcd->driver->dump_qh_qtd)
+			hcd->driver->dump_qh_qtd(hcd);
 		if (hcd->driver->dump_regs)
 			hcd->driver->dump_regs(hcd);
 		
@@ -795,10 +797,10 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 		dbg_status(ehci, "fatal", status);
 		ehci_halt(ehci);
 dead:
-		ehci_reset(ehci);
-		ehci_writel(ehci, 0, &ehci->regs->configured_flag);
-		usb_hc_died(hcd);
-		bh = 1;
+		
+		
+		
+		
 		if (&hcd->ssr_work)
 			queue_work(system_nrt_wq, &hcd->ssr_work);
 	}

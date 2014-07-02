@@ -519,7 +519,8 @@ void mipi_dsi_phy_init(int panel_ndx, struct msm_panel_info const *panel_info,
 	int target_type)
 {
 	struct mipi_dsi_phy_ctrl *pd;
-	int i, off;
+	struct mipi_dsi_reg_set *rs;
+	int i, off, rs_size;
 
 	MIPI_OUTP(MIPI_DSI_BASE + 0x128, 0x0001);
 	wmb();
@@ -534,6 +535,11 @@ void mipi_dsi_phy_init(int panel_ndx, struct msm_panel_info const *panel_info,
 	MIPI_OUTP(MIPI_DSI_BASE + 0x510, 0x0100);
 
 	MIPI_OUTP(MIPI_DSI_BASE + 0x4b0, 0x04);
+
+	if (!panel_info) {
+		pr_err("%s: panel_info is null\n", __func__);
+		return;
+	}
 
 	pd = (panel_info->mipi).dsi_phy_db;
 
@@ -584,6 +590,15 @@ void mipi_dsi_phy_init(int panel_ndx, struct msm_panel_info const *panel_info,
 
 	if (target_type == 1)
 		mipi_dsi_configure_serdes();
+
+	
+	rs = (panel_info->mipi).dsi_reg_db;
+	rs_size = (panel_info->mipi).dsi_reg_db_size;
+	if (rs && rs_size > 0) {
+		for (i = 0 ; i < rs_size; i++) {
+			MIPI_OUTP(MIPI_DSI_BASE + rs[i].reg, rs[i].value);
+		}
+	}
 }
 
 void cont_splash_clk_ctrl(int enable)

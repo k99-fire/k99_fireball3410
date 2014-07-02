@@ -28,6 +28,7 @@ static struct usb_composite_driver *composite;
 static int (*composite_gadget_bind)(struct usb_composite_dev *cdev);
 static void mtp_update_mode(int _mac_mtp_mode);
 static void fsg_update_mode(int _linux_fsg_mode);
+static bool is_mtp_enable(void);
 
 
 static ushort idVendor;
@@ -87,7 +88,7 @@ static void composite_disconnect(struct usb_gadget *gadget);
 static int usb_autobot_mode(void);
 int board_mfg_mode(void);
 void usb_composite_force_reset(struct usb_composite_dev *cdev);
-#define REQUEST_RESET_DELAYED msecs_to_jiffies(100)
+#define REQUEST_RESET_DELAYED (HZ / 10) 
 static void composite_request_reset(struct work_struct *w)
 {
 	struct usb_composite_dev *cdev = container_of(
@@ -98,10 +99,12 @@ static void composite_request_reset(struct work_struct *w)
 			return;
 
 		INFO(cdev, "%s\n", __func__);
-		if (os_type == OS_LINUX)
+		if (os_type == OS_LINUX && is_mtp_enable())
 			fsg_update_mode(1);
-		else
+		else {
 			fsg_update_mode(0);
+			return;
+		}
 		composite_disconnect(cdev->gadget);
 		usb_composite_force_reset(cdev);
 	}
@@ -717,7 +720,8 @@ int usb_remove_config(struct usb_composite_dev *cdev,
 	list_del(&config->list);
 
 	spin_unlock_irqrestore(&cdev->lock, flags);
-
+	os_type = OS_NOT_YET;
+	fsg_update_mode(0);
 	return unbind_config(cdev, config);
 }
 
@@ -1175,6 +1179,10 @@ static void composite_disconnect(struct usb_gadget *gadget)
 		reset_config(cdev);
 	if (composite->disconnect)
 		composite->disconnect(cdev);
+	if (cdev->delayed_status != 0) {
+		WARN(cdev, "%s: delayed_status is not 0 in disconnect status\n", __func__);
+		cdev->delayed_status = 0;
+	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }
 

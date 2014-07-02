@@ -543,8 +543,7 @@ static u32 vcd_set_property_cmn
 		}
 	case VCD_I_SET_TURBO_CLK:
 	{
-		if (cctxt->sched_clnt_hdl)
-			rc = vcd_set_perf_turbo_level(cctxt);
+        rc = vcd_set_perf_turbo_level(cctxt);
 		break;
 	}
 	case VCD_I_INTRA_PERIOD:

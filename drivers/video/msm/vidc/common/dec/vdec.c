@@ -42,7 +42,7 @@
 #define ERR(x...) pr_err("[VID] " x)
 
 #define VID_DEC_NAME "msm_vidc_dec"
-
+void keep_dig_voltage_low_in_idle(bool on);
 static char *node_name[2] = {"", "_sec"};
 static struct vid_dec_dev *vid_dec_device_p;
 static dev_t vid_dec_dev_num;
@@ -2052,6 +2052,7 @@ static u32 vid_dec_close_client(struct video_client_ctx *client_ctx)
 	u32 vcd_status;
 
 	INFO("msm_vidc_dec: Inside %s()", __func__);
+	keep_dig_voltage_low_in_idle(false);
 	if (!client_ctx || (!client_ctx->vcd_handle)) {
 		ERR("\n Invalid client_ctx");
 		return false;
@@ -2094,6 +2095,8 @@ int vid_dec_open_client(struct video_client_ctx **vid_clnt_ctx, int flags)
 	struct video_client_ctx *client_ctx = NULL;
 	u8 client_count;
 
+	INFO("msm_vidc_dec: Inside %s()", __func__);
+	keep_dig_voltage_low_in_idle(true);
 	if (!vid_clnt_ctx) {
 		ERR("Invalid input\n");
 		return -EINVAL;

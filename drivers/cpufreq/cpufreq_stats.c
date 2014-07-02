@@ -72,6 +72,11 @@ static int cpufreq_stats_update(unsigned int cpu)
 	cur_time = get_jiffies_64();
 	spin_lock(&cpufreq_stats_lock);
 	stat = per_cpu(cpufreq_stats_table, cpu);
+	if (!stat || stat->last_index == -1) {
+		spin_unlock(&cpufreq_stats_lock);
+		return 0;
+	}
+
 	if (stat->time_in_state)
 		stat->time_in_state[stat->last_index] +=
 			cur_time - stat->last_time;
@@ -314,6 +319,10 @@ static struct attribute_group stats_attr_group = {
 static int freq_table_get_index(struct cpufreq_stats *stat, unsigned int freq)
 {
 	int index;
+	if ( NULL == stat->freq_table ) {
+		printk(KERN_ERR "cpufreq: freq_table is null !!!\n");
+		return -1;
+	}
 	for (index = 0; index < stat->max_state; index++)
 		if (stat->freq_table[index] == freq)
 			return index;
@@ -322,7 +331,12 @@ static int freq_table_get_index(struct cpufreq_stats *stat, unsigned int freq)
 
 static void cpufreq_stats_free_table(unsigned int cpu)
 {
-	struct cpufreq_stats *stat = per_cpu(cpufreq_stats_table, cpu);
+	struct cpufreq_stats *stat = NULL;
+	spin_lock(&cpufreq_stats_lock);
+	stat = per_cpu(cpufreq_stats_table, cpu);
+	per_cpu(cpufreq_stats_table, cpu) = NULL;
+	spin_unlock(&cpufreq_stats_lock);
+
 	if (stat) {
 #if defined(CONFIG_ARCH_APQ8064) || defined(CONFIG_ARCH_MSM8960)
 		cpufreq_stats_update(cpu);
@@ -330,7 +344,6 @@ static void cpufreq_stats_free_table(unsigned int cpu)
 		kfree(stat->time_in_state);
 		kfree(stat);
 	}
-	per_cpu(cpufreq_stats_table, cpu) = NULL;
 }
 
 static void cpufreq_stats_free_sysfs(unsigned int cpu)
@@ -443,23 +456,29 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
 	if (val != CPUFREQ_POSTCHANGE)
 		return 0;
 
+	cpufreq_stats_update(freq->cpu);
+
+	spin_lock(&cpufreq_stats_lock);
 	stat = per_cpu(cpufreq_stats_table, freq->cpu);
-	if (!stat)
+	if (!stat) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
 	old_index = stat->last_index;
 	new_index = freq_table_get_index(stat, freq->new);
 
 	
-	if (old_index == -1 || new_index == -1)
+	if (old_index == -1 || new_index == -1) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
-	cpufreq_stats_update(freq->cpu);
-
-	if (old_index == new_index)
+	if (old_index == new_index) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
-	spin_lock(&cpufreq_stats_lock);
 	stat->last_index = new_index;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	stat->trans_table[old_index * stat->max_state + new_index]++;

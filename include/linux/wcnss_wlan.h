@@ -26,6 +26,7 @@ struct wcnss_wlan_config {
 };
 
 #define WCNSS_WLAN_IRQ_INVALID -1
+#define HAVE_WCNSS_RESET_INTR 1
 
 struct device *wcnss_wlan_get_device(void);
 struct resource *wcnss_wlan_get_memory_map(struct device *dev);
@@ -49,6 +50,7 @@ int free_riva_power_on_lock(char *driver_name);
 unsigned int wcnss_get_serial_number(void);
 void *wcnss_prealloc_get(unsigned int size);
 int wcnss_prealloc_put(void *ptr);
+void wcnss_reset_intr(void);
 #define wcnss_wlan_get_drvdata(dev) dev_get_drvdata(dev)
 #define wcnss_wlan_set_drvdata(dev, data) dev_set_drvdata((dev), (data))
 

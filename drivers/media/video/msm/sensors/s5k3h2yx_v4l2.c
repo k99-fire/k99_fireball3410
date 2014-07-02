@@ -360,6 +360,62 @@ static struct msm_camera_i2c_reg_conf s5k3h2yx_snap_settings[] = {
 	{ 0x301A , 0x77 }, 
 };
 
+static struct msm_camera_i2c_reg_conf s5k3h2yx_4_3_settings[] = {
+	
+	{0x0305, 0x04},
+	{0x0306, 0x00},
+	{0x0307, 0x98},
+	{0x0303, 0x01},
+	{0x0301, 0x05},
+	{0x030B, 0x01},
+	{0x0309, 0x05},
+	{0x30CC, 0xE0},
+	{0x31A1, 0x5A},
+
+	
+	{0x0200, 0x02},
+	{0x0201, 0x50},
+	{0x0202, 0x04},
+	{0x0203, 0xE7},
+	{0x0204, 0x00},
+	{0x0205, 0x20},
+	{0x0342, 0x0D},
+	{0x0343, 0x8E},
+#ifdef CONFIG_RAWCHIP
+	{0x0340, 0x09},
+	{0x0341, 0xC4},
+#else
+	{0x0340, 0x09},
+	{0x0341, 0xC0},
+#endif
+	
+	{0x0344, 0x00},
+	{0x0345, 0x00},
+	{0x0346, 0x00},
+	{0x0347, 0x00},
+	{0x0348, 0x0C},
+	{0x0349, 0xCF},
+	{0x034A, 0x09},
+	{0x034B, 0x9F},
+	{0x0381, 0x01},
+	{0x0383, 0x01},
+	{0x0385, 0x01},
+	{0x0387, 0x01},
+	{0x0105, 0x01}, 
+	{0x0401, 0x00},
+	{0x0405, 0x10},
+	{0x0700, 0x05},
+	{0x0701, 0x30},
+	{0x034C, 0x0C},
+	{0x034D, 0xD0},
+	{0x034E, 0x09},
+	{0x034F, 0xA0},
+
+	
+	{ 0x300E , 0x29 }, 
+	{ 0x31A3 , 0x00 }, 
+	{ 0x301A , 0x77 }, 
+};
 
 static struct msm_camera_i2c_reg_conf s5k3h2yx_snap_wide_settings[] = {
 
@@ -581,6 +637,8 @@ static struct msm_camera_i2c_conf_array s5k3h2yx_confs[] = {
 	ARRAY_SIZE(s5k3h2yx_fast_video_settings), 0, MSM_CAMERA_I2C_BYTE_DATA},
 	{&s5k3h2yx_snap_wide_settings[0],
 	ARRAY_SIZE(s5k3h2yx_snap_wide_settings), 0, MSM_CAMERA_I2C_BYTE_DATA},
+	{&s5k3h2yx_4_3_settings[0],
+	ARRAY_SIZE(s5k3h2yx_4_3_settings), 0, MSM_CAMERA_I2C_BYTE_DATA},
 	{&s5k3h2yx_night_settings[0],
 	ARRAY_SIZE(s5k3h2yx_night_settings), 0, MSM_CAMERA_I2C_BYTE_DATA},
 };
@@ -697,7 +755,51 @@ static struct msm_sensor_output_info_t s5k3h2yx_dimensions[] = {
 		.binning_rawchip = 0x22,
 #endif 
 	},
-	{/*night mode size*/
+	{
+		.x_output = 0xCD0,
+		.y_output = 0x740,
+		.line_length_pclk = 0xD8E,
+#ifdef CONFIG_RAWCHIP
+		.frame_length_lines = 0x960,  
+#else
+		.frame_length_lines = 0x960,  
+#endif
+		.vt_pixel_clk = 182400000,
+		.op_pixel_clk = 182400000,
+		.binning_factor = 1,
+		.x_addr_start = 0,
+		.y_addr_start = 0x0130,
+		.x_addr_end = 0xCCF,
+		.y_addr_end = 0x86F,
+		.x_even_inc = 1,
+		.x_odd_inc = 1,
+		.y_even_inc = 1,
+		.y_odd_inc = 1,
+		.binning_rawchip = 0x11,
+	},
+	{
+		.x_output = 0xCD0,
+		.y_output = 0x9A0,
+		.line_length_pclk = 0xD8E,
+#ifdef CONFIG_RAWCHIP
+		.frame_length_lines = 0x9C4,
+#else
+		.frame_length_lines = 0x9C0,
+#endif
+		.vt_pixel_clk = 182400000,
+		.op_pixel_clk = 182400000,
+		.binning_factor = 1,
+		.x_addr_start = 0,
+		.y_addr_start = 0,
+		.x_addr_end = 0xCCF,
+		.y_addr_end = 0x99F,
+		.x_even_inc = 1,
+		.x_odd_inc = 1,
+		.y_even_inc = 1,
+		.y_odd_inc = 1,
+		.binning_rawchip = 0x11,
+	},	
+	{
 		.x_output = 0x668,
 		.y_output = 0x4D0,
 		.line_length_pclk = 0xD8E,
@@ -719,30 +821,28 @@ static struct msm_sensor_output_info_t s5k3h2yx_dimensions[] = {
 		.y_odd_inc = 3,
 		.binning_rawchip = 0x22,
 	},
-	{/*wide full size*/
-		.x_output = 0xCD0,
-		.y_output = 0x740,
-		.line_length_pclk = 0xD8E,
-#ifdef CONFIG_RAWCHIP
-		.frame_length_lines = 0x960,  //0x764
-#else
-		.frame_length_lines = 0x960,  //0x750
-#endif
-		.vt_pixel_clk = 182400000,
-		.op_pixel_clk = 182400000,
-		.binning_factor = 1,
-		.x_addr_start = 0,
-		.y_addr_start = 0x0130,
-		.x_addr_end = 0xCCF,
-		.y_addr_end = 0x86F,
-		.x_even_inc = 1,
-		.x_odd_inc = 1,
-		.y_even_inc = 1,
-		.y_odd_inc = 1,
-		.binning_rawchip = 0x11,
-	},
 };
 
+#ifdef CONFIG_ARCH_MSM8X60
+
+static struct msm_camera_csi_params s5k3h2yx_csi_params = {
+	.data_format = CSI_RAW10,
+	.lane_cnt    = 2,
+	.lane_assign = 0xe4,
+	.dpcm_scheme = 0,
+	.settle_cnt  = 0x2a,
+};
+
+static struct msm_camera_csi_params *s5k3h2yx_csi_params_array[] = {
+	&s5k3h2yx_csi_params,
+	&s5k3h2yx_csi_params,
+	&s5k3h2yx_csi_params,
+	&s5k3h2yx_csi_params,
+	&s5k3h2yx_csi_params,
+	&s5k3h2yx_csi_params,
+};
+
+#else  
 static struct msm_camera_csid_vc_cfg s5k3h2yx_cid_cfg[] = {
 	{0, CSI_RAW10, CSI_DECODE_10BIT},
 	{1, CSI_EMBED_DATA, CSI_DECODE_8BIT},
@@ -771,6 +871,7 @@ static struct msm_camera_csi2_params *s5k3h2yx_csi_params_array[] = {
 	&s5k3h2yx_csi_params,
 	&s5k3h2yx_csi_params
 };
+#endif 
 
 static struct msm_sensor_output_reg_addr_t s5k3h2yx_reg_addr = {
 	.x_output = 0x34C,
@@ -1142,12 +1243,11 @@ static ssize_t vcm_clib_max_show(struct device *dev,
 }
 static DEVICE_ATTR(sensor, 0444, sensor_vendor_show, NULL);
 static DEVICE_ATTR(lensinfo, 0444, lens_info_show, NULL);
-/* #if 0 */
 static DEVICE_ATTR(vcmclib, 0444, vcm_clib_show, NULL);
 static DEVICE_ATTR(vcmclibmin, 0444, vcm_clib_min_show, NULL);
 static DEVICE_ATTR(vcmclibmed, 0444, vcm_clib_med_show, NULL);
 static DEVICE_ATTR(vcmclibmax, 0444, vcm_clib_max_show, NULL);
-/* #endif */
+
 static struct kobject *android_s5k3h2yx;
 
 static int s5k3h2yx_sysfs_init(void)
@@ -1484,7 +1584,11 @@ static struct msm_sensor_fn_t s5k3h2yx_func_tbl = {
 	.sensor_write_exp_gain_ex = msm_sensor_write_exp_gain1_ex,
 	.sensor_write_snapshot_exp_gain_ex = msm_sensor_write_exp_gain1_ex,
 	.sensor_set_dig_gain = s5k3h2_set_dig_gain,
+#ifdef CONFIG_ARCH_MSM8X60
+	.sensor_setting = msm_sensor_setting1,
+#else
 	.sensor_setting = msm_sensor_setting,
+#endif
 	.sensor_set_sensor_mode = msm_sensor_set_sensor_mode,
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
@@ -1520,7 +1624,11 @@ static struct msm_sensor_ctrl_t s5k3h2yx_s_ctrl = {
 	.sensor_id_info = &s5k3h2yx_id_info,
 	.sensor_exp_gain_info = &s5k3h2yx_exp_gain_info,
 	.cam_mode = MSM_SENSOR_MODE_INVALID,
+#ifdef CONFIG_ARCH_MSM8X60
+	.csic_params = &s5k3h2yx_csi_params_array[0],
+#else
 	.csi_params = &s5k3h2yx_csi_params_array[0],
+#endif
 	.msm_sensor_mutex = &s5k3h2yx_mut,
 	.sensor_i2c_driver = &s5k3h2yx_i2c_driver,
 	.sensor_v4l2_subdev_info = s5k3h2yx_subdev_info,

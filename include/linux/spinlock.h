@@ -96,8 +96,14 @@ static inline int do_raw_spin_trylock(raw_spinlock_t *lock)
 
 static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 {
-	arch_spin_unlock(&lock->raw_lock);
-	__release(lock);
+	if (likely(raw_spin_is_locked(lock))) {
+	    arch_spin_unlock(&lock->raw_lock);
+	    __release(lock);
+	}
+	else {
+		pr_warn("%s: try to unlock a non-locked spinlock.\n", __func__);
+		WARN_ON(1);
+	}
 }
 #endif
 

@@ -223,6 +223,7 @@ static inline void set_cpu_sd_state_idle(void) { }
 #endif
 
 extern void show_state_filter(unsigned long state_filter);
+extern void show_thread_group_state_filter(const char *tg_comm, unsigned long state_filter);
 
 static inline void show_state(void)
 {
@@ -1169,6 +1170,8 @@ struct task_struct {
 #ifdef CONFIG_DEBUG_MUTEXES
 	
 	struct mutex_waiter *blocked_on;
+	struct task_struct  *blocked_by;
+	unsigned long        blocked_since;
 #endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	unsigned int irq_events;
@@ -1432,6 +1435,9 @@ extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *
 extern int task_free_register(struct notifier_block *n);
 extern int task_free_unregister(struct notifier_block *n);
 
+extern int task_fork_register(struct notifier_block *n);
+extern int task_fork_unregister(struct notifier_block *n);
+
 #define PF_EXITING	0x00000004	
 #define PF_EXITPIDONE	0x00000008	
 #define PF_VCPU		0x00000010	
@@ -1444,6 +1450,7 @@ extern int task_free_unregister(struct notifier_block *n);
 #define PF_MEMALLOC	0x00000800	
 #define PF_NPROC_EXCEEDED 0x00001000	
 #define PF_USED_MATH	0x00002000	
+#define PF_WAKE_UP_IDLE 0x00004000	
 #define PF_NOFREEZE	0x00008000	
 #define PF_FROZEN	0x00010000	
 #define PF_FSTRANS	0x00020000	
@@ -1546,6 +1553,14 @@ static inline int set_cpus_allowed_ptr(struct task_struct *p,
 }
 #endif
 
+static inline void set_wake_up_idle(bool enabled)
+{
+	if (enabled)
+		current->flags |= PF_WAKE_UP_IDLE;
+	else
+		current->flags &= ~PF_WAKE_UP_IDLE;
+}
+
 #ifdef CONFIG_NO_HZ
 void calc_load_enter_idle(void);
 void calc_load_exit_idle(void);
@@ -1625,6 +1640,7 @@ extern unsigned int sysctl_sched_latency;
 extern unsigned int sysctl_sched_min_granularity;
 extern unsigned int sysctl_sched_wakeup_granularity;
 extern unsigned int sysctl_sched_child_runs_first;
+extern unsigned int sysctl_sched_wake_to_idle;
 
 enum sched_tunable_scaling {
 	SCHED_TUNABLESCALING_NONE,
@@ -2170,7 +2186,16 @@ static inline void thread_group_cputime_init(struct signal_struct *sig)
 extern void recalc_sigpending_and_wake(struct task_struct *t);
 extern void recalc_sigpending(void);
 
-extern void signal_wake_up(struct task_struct *t, int resume_stopped);
+extern void signal_wake_up_state(struct task_struct *t, unsigned int state);
+
+static inline void signal_wake_up(struct task_struct *t, bool resume)
+{
+	signal_wake_up_state(t, resume ? TASK_WAKEKILL : 0);
+}
+static inline void ptrace_signal_wake_up(struct task_struct *t, bool resume)
+{
+	signal_wake_up_state(t, resume ? __TASK_TRACED : 0);
+}
 
 #ifdef CONFIG_SMP
 

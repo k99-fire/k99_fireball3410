@@ -353,6 +353,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 	struct mdp_hist_mgmt *mgmt = NULL;
 	char *base_addr;
 	int i, ret;
+	static unsigned long prev_jiffy = 0; 
 
 	mdp_is_in_isr = TRUE;
 
@@ -384,6 +385,17 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 	if (isr & INTR_EXTERNAL_INTF_UDERRUN) {
 		pr_debug("%s: UNDERRUN -- external\n", __func__);
 		mdp4_stat.intr_underrun_e++;
+	}
+
+	if (isr & (INTR_PRIMARY_INTF_UDERRUN|INTR_EXTERNAL_INTF_UDERRUN)) {
+		if (time_after(jiffies, prev_jiffy + 5 * HZ) || !prev_jiffy) {
+			pr_info("%s: UNDERRUN isr: 0x%x (pri: %lu, ext: %lu)\n",
+			     __func__, isr,
+			     mdp4_stat.intr_underrun_p, mdp4_stat.intr_underrun_e);
+
+			mdp4_overlay_mdp_perf_dump();
+			prev_jiffy = jiffies;
+		}
 	}
 
 	isr &= mask;
@@ -2850,7 +2862,7 @@ int mdp4_pcc_cfg(struct mdp_pcc_cfg_data *cfg_ptr)
 		break;
 
 	default:
-		break;
+		return ret;
 	}
 
 	if (0x8 & cfg_ptr->ops)
@@ -2980,9 +2992,9 @@ static int mdp4_argc_process_write_req(uint32_t *offset,
 		struct mdp_pgc_lut_data *pgc_ptr)
 {
 	int ret = -1;
-	struct mdp_ar_gc_lut_data r[MDP_AR_GC_MAX_STAGES];
-	struct mdp_ar_gc_lut_data g[MDP_AR_GC_MAX_STAGES];
-	struct mdp_ar_gc_lut_data b[MDP_AR_GC_MAX_STAGES];
+	static struct mdp_ar_gc_lut_data r[MDP_AR_GC_MAX_STAGES];
+	static struct mdp_ar_gc_lut_data g[MDP_AR_GC_MAX_STAGES];
+	static struct mdp_ar_gc_lut_data b[MDP_AR_GC_MAX_STAGES];
 
 	ret = copy_from_user(&r[0], pgc_ptr->r_data,
 		pgc_ptr->num_r_stages * sizeof(struct mdp_ar_gc_lut_data));

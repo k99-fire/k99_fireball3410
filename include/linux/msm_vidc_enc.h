@@ -360,6 +360,12 @@ struct venc_ioctl_msg{
 #define VEN_IOCTL_SET_SLICE_DELIVERY_MODE \
 	_IO(VEN_IOCTLBASE_ENC, 50)
 
+#define VEN_IOCTL_SET_PERF_CLK \
+    _IOR(VEN_IOCTLBASE_ENC, 51, struct venc_ioctl_msg)
+
+#define VEN_IOCTL_SET_SPS_PPS_FOR_IDR \
+	_IOW(VEN_IOCTLBASE_ENC, 52, struct venc_ioctl_msg)
+
 struct venc_switch{
 	unsigned char	status;
 };

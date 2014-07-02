@@ -130,6 +130,7 @@ extern struct device dsi_dev;
 extern int mipi_dsi_clk_on;
 extern u32 dsi_irq;
 extern u32 esc_byte_ratio;
+extern int panel_type;
 
 extern void  __iomem *periph_base;
 extern char *mmss_cc_base;	
@@ -188,7 +189,7 @@ struct dsi_clk_desc {
 #define DSI_HDR_DATA1(data)	((data) & 0x0ff)
 #define DSI_HDR_WC(wc)		((wc) & 0x0ffff)
 
-#define DSI_BUF_SIZE	64
+#define DSI_BUF_SIZE	1024
 #define MIPI_DSI_MRPS	0x04	
 
 #define MIPI_DSI_LEN 8 
@@ -332,7 +333,9 @@ void mipi_dsi_ahb_ctrl(u32 enable);
 void cont_splash_clk_ctrl(int enable);
 void mipi_dsi_turn_on_clks(void);
 void mipi_dsi_turn_off_clks(void);
-void mipi_dsi_clk_cfg(int on, int force);
+void mipi_dsi_clk_cfg(int on);
+void mipi_dsi_clk_turn_on(struct msm_panel_info const *pinfo, int target_type);
+void mipi_dsi_clk_turn_off(void);
 
 int mipi_dsi_cmdlist_put(struct dcs_cmd_req *cmdreq);
 struct dcs_cmd_req *mipi_dsi_cmdlist_get(void);
@@ -343,4 +346,8 @@ void mipi_dsi_cmd_mdp_busy(void);
 void update_lane_config(struct msm_panel_info *pinfo);
 #endif
 
+#ifdef CONFIG_FB_MSM_ESD_WORKAROUND
+uint32 mipi_dsi_cmd_bta_sw_trigger_status(void);
+uint32 mipi_dsi_read_power_mode(void);
+#endif
 #endif 

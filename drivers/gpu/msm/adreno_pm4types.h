@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2002,2007-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -102,6 +102,10 @@
 
 
 #define CP_IM_STORE            0x2c
+
+#define CP_TEST_TWO_MEMS    0x71
+
+#define CP_WAIT_FOR_ME      0x13
 
 #define CP_SET_BIN_BASE_OFFSET     0x4B
 

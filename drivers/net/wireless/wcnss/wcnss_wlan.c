@@ -22,6 +22,8 @@
 #include <linux/jiffies.h>
 #include <linux/gpio.h>
 #include <mach/peripheral-loader.h>
+#include <linux/io.h>
+#include <mach/msm_iomap.h>
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #include "wcnss_prealloc.h"
@@ -108,6 +110,13 @@ static ssize_t wcnss_thermal_mitigation_store(struct device *dev,
 
 static DEVICE_ATTR(thermal_mitigation, S_IRUSR | S_IWUSR,
 	wcnss_thermal_mitigation_show, wcnss_thermal_mitigation_store);
+void wcnss_reset_intr(void)
+{
+	pr_info("%s: reset interrupt RIVA\n", __func__);
+	wmb();
+	__raw_writel(1 << 24, MSM_APCS_GCC_BASE + 0x8);
+}
+EXPORT_SYMBOL(wcnss_reset_intr);
 
 static int wcnss_create_sysfs(struct device *dev)
 {

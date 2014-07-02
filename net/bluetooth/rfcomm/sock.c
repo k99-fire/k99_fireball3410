@@ -478,7 +478,7 @@ static int rfcomm_sock_accept(struct socket *sock, struct socket *newsock, int f
 
 	timeo = sock_rcvtimeo(sk, flags & O_NONBLOCK);
 
-	BT_DBG("sk %p timeo %ld", sk, timeo);
+	printk("sk %p timeo %ld", sk, timeo);
 
 	
 	add_wait_queue_exclusive(sk_sleep(sk), &wait);

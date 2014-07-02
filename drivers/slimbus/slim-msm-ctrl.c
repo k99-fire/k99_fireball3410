@@ -742,7 +742,10 @@ static int msm_xfer_msg(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 	if (txn->mt == SLIM_MSG_MT_CORE &&
 		mc == SLIM_MSG_MC_BEGIN_RECONFIGURATION) {
 		if (dev->reconf_busy) {
-			wait_for_completion(&dev->reconf);
+			pr_err("Start to wait for completion\n");
+			timeout = wait_for_completion_timeout(&dev->reconf,msecs_to_jiffies(300));
+			if (!timeout)
+				pr_err("Timeout while sending BEGIN_RECONFIGURATION");
 			dev->reconf_busy = false;
 		}
 		
@@ -822,8 +825,11 @@ static int msm_xfer_msg(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 	dev->wr_comp = &done;
 	msm_send_msg_buf(ctrl, pbuf, txn->rl);
 	timeout = wait_for_completion_timeout(&done, HZ);
-	if (!timeout)
+	if (!timeout) {
 		dev->wr_comp = NULL;
+		if ( mc >= SLIM_MSG_MC_BEGIN_RECONFIGURATION && mc <= SLIM_MSG_MC_RECONFIGURE_NOW )
+			dev->reconf_busy = false;
+	}
 	if (mc == SLIM_MSG_MC_RECONFIGURE_NOW) {
 		if ((txn->mc == (SLIM_MSG_MC_RECONFIGURE_NOW |
 					SLIM_MSG_CLK_PAUSE_SEQ_FLG)) &&
@@ -1033,6 +1039,7 @@ static int msm_sat_define_ch(struct msm_slim_sat *sat, u8 *buf, u8 len, u8 mc)
 		u16 chh[40];
 		struct slim_ch prop;
 		u32 exp;
+		u16 *grph = NULL;
 		u8 coeff, cc;
 		u8 prrate = buf[6];
 		if (len <= 8)
@@ -1053,6 +1060,9 @@ static int msm_sat_define_ch(struct msm_slim_sat *sat, u8 *buf, u8 len, u8 mc)
 					return ret;
 				if (mc == SLIM_USR_MC_DEF_ACT_CHAN)
 					sat->satch[j].req_def++;
+				
+				if (i == 8)
+					grph = &sat->satch[j].chanh;
 				continue;
 			}
 			if (sat->nsatch >= MSM_MAX_SATCH)
@@ -1064,6 +1074,8 @@ static int msm_sat_define_ch(struct msm_slim_sat *sat, u8 *buf, u8 len, u8 mc)
 			sat->satch[j].chanh = chh[i - 8];
 			if (mc == SLIM_USR_MC_DEF_ACT_CHAN)
 				sat->satch[j].req_def++;
+			if (i == 8)
+				grph = &sat->satch[j].chanh;
 			sat->nsatch++;
 		}
 		prop.dataf = (enum slim_ch_dataf)((buf[3] & 0xE0) >> 5);
@@ -1084,10 +1096,12 @@ static int msm_sat_define_ch(struct msm_slim_sat *sat, u8 *buf, u8 len, u8 mc)
 					true, &chh[0]);
 		else
 			ret = slim_define_ch(&sat->satcl, &prop,
-					&chh[0], 1, false, NULL);
+					chh, 1, true, &chh[0]);
 		dev_dbg(dev->dev, "define sat grp returned:%d", ret);
 		if (ret)
 			return ret;
+		else if (grph)
+			*grph = chh[0];
 
 		
 		if (mc == SLIM_USR_MC_DEF_ACT_CHAN)
@@ -1212,6 +1226,8 @@ static void slim_sat_rxprocess(struct work_struct *work)
 						slim_control_ch(&sat->satcl,
 							sat->satch[i].chanh,
 							SLIM_CH_REMOVE, true);
+						slim_dealloc_ch(&sat->satcl,
+							sat->satch[i].chanh);
 						sat->satch[i].reconf = false;
 					}
 				}

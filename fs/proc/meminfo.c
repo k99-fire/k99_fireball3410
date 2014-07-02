@@ -162,7 +162,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		"VmallocVpage:   %8lu kB\n"
 		"VmallocChunk:   %8lu kB\n"
 		"KGSL_ALLOC:     %8lu kB\n"
-		"ION_ALLOC:     %8d kB\n"
+		"ION_ALLOC:      %8d kB\n"
 #ifdef CONFIG_MEMORY_FAILURE
 		"HardwareCorrupted: %5lu kB\n"
 #endif

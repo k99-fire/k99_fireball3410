@@ -130,6 +130,21 @@ static inline void rfcomm_schedule(void)
 
 static inline void rfcomm_session_put(struct rfcomm_session *s)
 {
+	bool match = false;
+	struct rfcomm_session *sess;
+	struct list_head *p, *n;
+	list_for_each_safe(p, n, &session_list) {
+		sess = list_entry(p, struct rfcomm_session, list);
+		if (s == sess) {
+			match = true;
+			break;
+		}
+	}
+	if (!match) {
+		BT_ERR("session already freed previously");
+		dump_stack();
+		return;
+	}
 	if (atomic_dec_and_test(&s->refcnt))
 		rfcomm_session_del(s);
 }
@@ -1282,7 +1297,7 @@ void rfcomm_dlc_accept(struct rfcomm_dlc *d)
 	d->state_change(d, 0);
 	rfcomm_dlc_unlock(d);
 
-	if (d->role_switch)
+	if ((d->role_switch) && (!is_prefer_slave(l2cap_pi(sk)->conn->dst)))
 		hci_conn_switch_role(l2cap_pi(sk)->conn->hcon, 0x00);
 
 	rfcomm_send_msc(d->session, 1, d->dlci, d->v24_sig);

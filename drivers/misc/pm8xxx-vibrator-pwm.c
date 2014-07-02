@@ -216,10 +216,6 @@ static ssize_t duty_store(
 		VIB_PWM_INFO("%s dutys input fail, duty must between 0 and duty_period\n",__func__);
 		return -EINVAL;
 	}
-	if (duty_period > 62 || duty_period < 50){
-		VIB_PWM_INFO("%s dutys input fail, duty_period must between 50 to 62\n",__func__);
-		return -EINVAL;
-	}
 	duty_us = duty;
 	period_us = duty_period;
 	return size;
@@ -310,13 +306,12 @@ static int __devinit pm8xxx_vib_probe(struct platform_device *pdev)
 	vib->timed_dev.name = "vibrator";
 	vib->timed_dev.get_time = pm8xxx_vib_get_time;
 	vib->timed_dev.enable = pm8xxx_vib_enable;
-	if (vib->pdata->bank) {
-		vib->pwm_vib = pwm_request(vib->pdata->bank, vib->timed_dev.name);
-		if (vib->pwm_vib < 0){
-			rc = -ENOMEM;
-			VIB_PWM_ERR("%s, pwm_request fail\n", __func__);
-			goto err_pwm_request;
-		}
+
+	vib->pwm_vib = pwm_request(vib->pdata->bank, vib->timed_dev.name);
+	if (vib->pwm_vib < 0){
+		rc = -ENOMEM;
+		VIB_PWM_ERR("%s, pwm_request fail\n", __func__);
+		goto err_pwm_request;
 	}
 	rc = gpio_request(vib->ena_gpio, "TI_AMP_ena");
 	if (rc) {

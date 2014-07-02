@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -121,6 +121,7 @@ struct kgsl_snapshot_istore {
 #define SNAPSHOT_DEBUG_CP_PFP_RAM 9
 #define SNAPSHOT_DEBUG_CP_ROQ     10
 #define SNAPSHOT_DEBUG_SHADER_MEMORY 11
+#define SNAPSHOT_DEBUG_CP_MERCIU 12
 
 struct kgsl_snapshot_debug {
 	int type;    
@@ -192,6 +193,13 @@ struct kgsl_snapshot_registers {
 	int count;	     
 };
 
+struct kgsl_snapshot_registers_list {
+	
+	struct kgsl_snapshot_registers *registers;
+	
+	int count;
+};
+
 int kgsl_snapshot_dump_regs(struct kgsl_device *device, void *snapshot,
 	int remain, void *priv);
 
@@ -210,6 +218,9 @@ void *kgsl_snapshot_indexed_registers(struct kgsl_device *device,
 
 int kgsl_snapshot_get_object(struct kgsl_device *device, unsigned int ptbase,
 	unsigned int gpuaddr, unsigned int size, unsigned int type);
+
+int kgsl_snapshot_have_object(struct kgsl_device *device, unsigned int ptbase,
+	unsigned int gpuaddr, unsigned int size);
 
 #endif
 #endif

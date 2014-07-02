@@ -80,6 +80,7 @@ struct synaptics_i2c_rmi_platform_data {
 				
 				
 	int (*power)(int on);	
+	int (*lpm_power)(int on);
 	struct synaptics_virtual_key *virtual_key;
 	uint8_t virtual_key_num;
 	struct kobject *vk_obj;

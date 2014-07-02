@@ -74,6 +74,7 @@ struct mmc_ext_csd {
 #define MMC_HS200_MAX_DTR	200000000
 	unsigned int		sectors;
 	unsigned int		card_type;
+	unsigned char		fwrev[7];			
 	unsigned int		hc_erase_size;		
 	unsigned int		hc_erase_timeout;	
 	unsigned int		sec_trim_mult;	
@@ -314,11 +315,11 @@ struct mmc_card {
 	unsigned int		sd_bus_speed;	
 
 	struct dentry		*debugfs_root;
-	unsigned int		sd_removed;
 	unsigned char		do_remove;
 	struct mmc_part	part[MMC_NUM_PHY_PARTITION]; 
 	unsigned int    nr_parts;
 	unsigned int		wr_perf; 
+	s8			speed_class; 
 
 	struct mmc_wr_pack_stats wr_pack_stats; 
 };

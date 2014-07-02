@@ -9,7 +9,7 @@ config PN544_NFC
 	tristate "PN544 NFC driver"
 	depends on I2C
 	select CRC_CCITT
-	default y
+	default n
 	---help---
 	  Say yes if you want PN544 Near Field Communication driver.
 	  This is for i2c connected version. If unsure, say N here.

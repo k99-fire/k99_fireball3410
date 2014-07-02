@@ -478,7 +478,7 @@ static int netlink_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 	struct netlink_sock *nlk;
 
-	if (!sk)
+	if (IS_ERR(sk) || (!sk))
 		return 0;
 
 	netlink_remove(sk);
@@ -1070,12 +1070,8 @@ int netlink_broadcast_filtered(struct sock *ssk, struct sk_buff *skb, u32 pid,
 
 	if (info.delivery_failure) {
 
-#ifdef CONFIG_HTC_NETWORK_MODIFY
 		if (!IS_ERR(info.skb2) && (info.skb2))
 			kfree_skb(info.skb2);
-#else
-			kfree_skb(info.skb2);
-#endif
 
 		return -ENOBUFS;
 	} else

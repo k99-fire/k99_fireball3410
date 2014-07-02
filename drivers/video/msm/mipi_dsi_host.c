@@ -64,6 +64,7 @@ enum {
 
 struct dcs_cmd_list	cmdlist;
 
+void mipi_dsi_error(void);
 #ifdef CONFIG_FB_MSM_MDP40
 void mipi_dsi_mdp_stat_inc(int which)
 {
@@ -161,27 +162,72 @@ void mipi_dsi_disable_irq_nosync(u32 term)
 	spin_unlock(&dsi_irq_lock);
 }
 
-void mipi_dsi_clk_cfg(int on, int force)
-{
-	static int dsi_clk_cnt;
+static int dsi_clk_cnt;
+static int dsi_clk_on_aux;
 
+void mipi_dsi_clk_turn_on(struct msm_panel_info const *pinfo, int target_type)
+{
+	mutex_lock(&clk_mutex);
+
+	if (!dsi_clk_on_aux && !dsi_clk_cnt) {
+		mipi_dsi_prepare_clocks();
+		mipi_dsi_ahb_ctrl(1);
+
+		mipi_dsi_phy_ctrl(1);
+		mipi_dsi_phy_init(0, pinfo, target_type);
+
+		mipi_dsi_clk_enable();
+
+		dsi_clk_on_aux = 1;
+		dsi_clk_cnt = 1;
+	}
+
+	mutex_unlock(&clk_mutex);
+}
+
+void mipi_dsi_clk_turn_off()
+{
+	mutex_lock(&clk_mutex);
+
+	pr_debug("%s: turn off dsi clk and dsi engine, cnt = %d\n",
+	    __func__, dsi_clk_cnt);
+
+	mipi_dsi_clk_disable();
+
+	
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0);
+
+	mipi_dsi_phy_ctrl(0);
+	mipi_dsi_ahb_ctrl(0);
+	mipi_dsi_unprepare_clocks();
+
+	dsi_clk_on_aux = 0;
+	dsi_clk_cnt = 0;
+
+	mutex_unlock(&clk_mutex);
+}
+
+void mipi_dsi_clk_cfg(int on)
+{
 	mutex_lock(&clk_mutex);
 	if (on) {
-		if (dsi_clk_cnt == 0) {
+		if (dsi_clk_on_aux) {
+			dsi_clk_on_aux = 0;
+		} else if (dsi_clk_cnt == 0) {
 			mipi_dsi_prepare_clocks();
 			mipi_dsi_ahb_ctrl(1);
 			mipi_dsi_clk_enable();
 		}
 		dsi_clk_cnt++;
 	} else {
-		if (dsi_clk_cnt) {
+		if (dsi_clk_cnt)
 			dsi_clk_cnt--;
-			if (dsi_clk_cnt == 0 && force == 0) {
-				mipi_dsi_clk_disable();
-				mipi_dsi_ahb_ctrl(0);
-				mipi_dsi_unprepare_clocks();
-			}
+		if (dsi_clk_cnt == 0) {
+			mipi_dsi_clk_disable();
+			mipi_dsi_ahb_ctrl(0);
+			mipi_dsi_unprepare_clocks();
 		}
+		dsi_clk_on_aux = 0;
 	}
 	pr_debug("%s: on=%d clk_cnt=%d pid=%d\n", __func__,
 				on, dsi_clk_cnt, current->pid);
@@ -1043,7 +1089,56 @@ void mipi_dsi_set_tear_off(struct msm_fb_data_type *mfd)
 
 	mipi_dsi_cmdlist_put(&cmdreq);
 }
+#ifdef CONFIG_FB_MSM_ESD_WORKAROUND
+uint32 mipi_dsi_cmd_bta_sw_trigger_status(void)
+{
+        uint32 data, status;
+        int cnt = 0;
 
+        MIPI_OUTP(MIPI_DSI_BASE + 0x094, 0x01); 
+        wmb();
+
+        while (cnt < 100000) {
+                data = MIPI_INP(MIPI_DSI_BASE + 0x0004);
+                if ((data & 0x0010) == 0)
+                        break;
+                cnt++;
+        }
+
+        status = MIPI_INP(MIPI_DSI_BASE + 0x0064);
+
+        if (status) {
+                pr_err("%s: status=%x\n", __func__, status);
+        }
+
+        pr_info("%s: BTA done, cnt=%d\n", __func__, cnt);
+
+	return status;
+}
+
+static char read_power_mode[2] = {0x0A, 0x00};
+static struct dsi_cmd_desc power_mode_cmd = {
+        DTYPE_DCS_READ, 1, 0, 0, 0, sizeof(read_power_mode), read_power_mode};
+uint32 pwr_mode;
+
+static void mipi_read_power_mode_cb(u32 data)
+{
+	pwr_mode = data & 0xff;
+	pr_info("%s: power_mode=%x\n", __func__, pwr_mode);
+}
+
+uint32 mipi_dsi_read_power_mode(void)
+{
+	cmdreq.cmds = &power_mode_cmd;
+	cmdreq.cmds_cnt = 1;
+	cmdreq.flags = CMD_REQ_RX | CMD_REQ_COMMIT;
+	cmdreq.rlen = 1;
+	cmdreq.cb = mipi_read_power_mode_cb;
+	mipi_dsi_cmdlist_put(&cmdreq);
+
+	return pwr_mode;
+}
+#endif
 int mipi_dsi_cmd_reg_tx(uint32 data)
 {
 #ifdef DSI_HOST_DEBUG
@@ -1094,7 +1189,7 @@ int mipi_dsi_cmds_tx(struct dsi_buf *tp, struct dsi_cmd_desc *cmds, int cnt)
 		mipi_dsi_cmd_dma_add(tp, cm);
 		mipi_dsi_cmd_dma_tx(tp);
 		if (cm->wait)
-			msleep(cm->wait);
+			hr_msleep(cm->wait);
 		cm++;
 	}
 
@@ -1293,6 +1388,7 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 {
 
 	unsigned long flags;
+	int ret = 0;
 
 #ifdef DSI_HOST_DEBUG
 	int i;
@@ -1330,8 +1426,17 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 	dsi_cmd_dma_need_wait++;
 	spin_unlock_irqrestore(&dsi_mdp_lock, flags);
 
-	if (dsi_cmd_dma_need_wait)
-		wait_for_completion_timeout(&dsi_dma_comp, HZ/20);
+	if (dsi_cmd_dma_need_wait) {
+		ret = wait_for_completion_timeout(&dsi_dma_comp, HZ/20);
+		if (ret <= 0) {
+			pr_info("%s: wait for dsi_dma complete timeout (ret=%d, busy=%d, stat=0x%x)\n",
+			    __func__, ret, dsi_cmd_dma_need_wait, MIPI_INP(MIPI_DSI_BASE + 0x0004));
+			if (dsi_cmd_dma_need_wait > 5) {
+				mipi_dsi_error();
+				mipi_dsi_sw_reset();
+			}
+		}
+	}
 
 	dma_unmap_single(&dsi_dev, tp->dmap, tp->len, DMA_TO_DEVICE);
 	tp->dmap = 0;
@@ -1472,7 +1577,7 @@ void mipi_dsi_cmdlist_commit(int from_mdp)
 	video &= 0x02; 
 
 	if (!video)
-		mipi_dsi_clk_cfg(1, 0);
+		mipi_dsi_clk_cfg(1);
 
 	pr_debug("%s:  from_mdp=%d pid=%d\n", __func__, from_mdp, current->pid);
 
@@ -1493,7 +1598,7 @@ void mipi_dsi_cmdlist_commit(int from_mdp)
 		mipi_dsi_cmdlist_tx(req);
 
 	if (!video)
-		mipi_dsi_clk_cfg(0, 0);
+		mipi_dsi_clk_cfg(0);
 
 need_lock:
 	if (from_mdp) 
@@ -1551,7 +1656,7 @@ void mipi_dsi_ack_err_status(void)
 
 	if (status) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0064, status);
-		pr_debug("%s: status=%x\n", __func__, status);
+		pr_info("%s: status=%x\n", __func__, status);
 	}
 }
 
@@ -1562,7 +1667,7 @@ void mipi_dsi_timeout_status(void)
 	status = MIPI_INP(MIPI_DSI_BASE + 0x00bc);
 	if (status & 0x0111) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x00bc, status);
-		pr_debug("%s: status=%x\n", __func__, status);
+		pr_info("%s: status=%x\n", __func__, status);
 	}
 }
 
@@ -1574,7 +1679,7 @@ void mipi_dsi_dln0_phy_err(void)
 
 	if (status & 0x011111) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x00b0, status);
-		pr_debug("%s: status=%x\n", __func__, status);
+		pr_info("%s: status=%x\n", __func__, status);
 	}
 }
 
@@ -1586,7 +1691,7 @@ void mipi_dsi_fifo_status(void)
 
 	if (status & 0x44444489) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0008, status);
-		pr_debug("%s: status=%x\n", __func__, status);
+		pr_info("%s: status=%x\n", __func__, status);
 	}
 }
 
@@ -1598,7 +1703,7 @@ void mipi_dsi_status(void)
 
 	if (status & 0x80000000) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0004, status);
-		pr_debug("%s: status=%x\n", __func__, status);
+		pr_info("%s: status=%x\n", __func__, status);
 	}
 }
 
@@ -1615,10 +1720,13 @@ void mipi_dsi_error(void)
 
 irqreturn_t mipi_dsi_isr(int irq, void *ptr)
 {
-	uint32 isr;
+	uint32 isr, status;
 
 	isr = MIPI_INP(MIPI_DSI_BASE + 0x010c);
 	MIPI_OUTP(MIPI_DSI_BASE + 0x010c, isr);
+
+	
+	status = MIPI_INP(MIPI_DSI_BASE + 0x0004);
 
 	pr_debug("%s: isr=%x\n", __func__, (int)isr);
 

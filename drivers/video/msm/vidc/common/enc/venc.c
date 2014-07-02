@@ -45,6 +45,7 @@ extern u32 vidc_msg_debug;
 #define INFO(x...) printk(KERN_INFO "[VID] " x)
 #define ERR(x...) printk(KERN_ERR "[VID] " x)
 
+void keep_dig_voltage_low_in_idle(bool on);
 static struct vid_enc_dev *vid_enc_device_p;
 static dev_t vid_enc_dev_num;
 static struct class *vid_enc_class;
@@ -74,6 +75,29 @@ static s32 vid_enc_get_empty_client_index(void)
 	}
 }
 
+static u32 vid_enc_set_turbo_clk(struct video_client_ctx *client_ctx)
+{
+    struct vcd_property_hdr vcd_property_hdr;
+    u32 vcd_status = VCD_ERR_FAIL;
+    u32 dummy = 0;
+    if (!client_ctx)
+      return false;
+
+    vcd_property_hdr.prop_id = VCD_I_SET_TURBO_CLK;
+    vcd_property_hdr.sz = sizeof(struct vcd_property_frame_size);
+    vcd_status = vcd_set_property(client_ctx->vcd_handle,
+                                &vcd_property_hdr, &dummy);
+
+    if (vcd_status)
+    {
+      pr_err("\n %s: set turbo mode failed\n", __FUNCTION__);
+      return false;
+    }
+    else
+    {
+      return true;
+    }
+}
 
 u32 vid_enc_get_status(u32 status)
 {
@@ -530,7 +554,7 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 	INFO(" msm_vidc_enc: Inside %s()", __func__);
 
 	mutex_lock(&vid_enc_device_p->lock);
-
+	keep_dig_voltage_low_in_idle(true);
 	stop_cmd = 0;
 	client_count = vcd_get_num_of_clients();
 	if (client_count == VIDC_MAX_NUM_CLIENTS) {
@@ -553,6 +577,11 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 			__func__);
 		return -ENODEV;
 	}
+
+	
+	if (client_index == -ENOMEM)
+		return -ENOMEM;
+	
 
 	client_ctx =
 		&vid_enc_device_p->venc_clients[client_index];
@@ -596,6 +625,7 @@ static int vid_enc_release(struct inode *inode, struct file *file)
 {
 	struct video_client_ctx *client_ctx = file->private_data;
 	INFO(" msm_vidc_enc: Inside %s()", __func__);
+	keep_dig_voltage_low_in_idle(false);
 	vid_enc_close_client(client_ctx);
 	vidc_release_firmware();
 #ifndef USE_RES_TRACKER
@@ -1625,6 +1655,43 @@ static long vid_enc_ioctl(struct file *file,
 		}
 		break;
 	}
+    case VEN_IOCTL_SET_PERF_CLK:
+    {
+        u32 vcd_status = VCD_ERR_FAIL;
+        vcd_status = vid_enc_set_turbo_clk(client_ctx);
+        if(!vcd_status)
+        {
+            pr_err("\n %s: Setting turbo mode failed \n", __FUNCTION__);
+            return -EIO;
+        }
+        break;
+    }
+	case VEN_IOCTL_SET_SPS_PPS_FOR_IDR:
+	{
+		struct vcd_property_hdr vcd_property_hdr;
+		struct vcd_property_sps_pps_for_idr_enable idr_enable;
+		u32 vcd_status = VCD_ERR_FAIL;
+		u32 enabled = 1;
+
+		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+			return -EFAULT;
+
+		vcd_property_hdr.prop_id = VCD_I_ENABLE_SPS_PPS_FOR_IDR;
+		vcd_property_hdr.sz = sizeof(idr_enable);
+
+		if (copy_from_user(&enabled, venc_msg.in, sizeof(u32)))
+			return -EFAULT;
+
+		idr_enable.sps_pps_for_idr_enable_flag = enabled;
+		vcd_status = vcd_set_property(client_ctx->vcd_handle,
+				&vcd_property_hdr, &idr_enable);
+		if (vcd_status) {
+			pr_err("Setting sps/pps per IDR failed");
+			return -EIO;
+		}
+		break;
+	}
+
 	case VEN_IOCTL_SET_AC_PREDICTION:
 	case VEN_IOCTL_GET_AC_PREDICTION:
 	case VEN_IOCTL_SET_RVLC:

@@ -145,7 +145,7 @@ static void mdp4_lcdc_blt_ov_update(struct mdp4_overlay_pipe *pipe);
 static void mdp4_lcdc_wait4dmap(int cndx);
 static void mdp4_lcdc_wait4ov(int cndx);
 
-int mdp4_lcdc_pipe_commit(void)
+int mdp4_lcdc_pipe_commit(int cndx, int wait)
 {
 
 	int  i, undx;
@@ -157,7 +157,7 @@ int mdp4_lcdc_pipe_commit(void)
 	unsigned long flags;
 	int cnt = 0;
 
-	vctrl = &vsync_ctrl_db[0];
+	vctrl = &vsync_ctrl_db[cndx];
 
 	mutex_lock(&vctrl->update_lock);
 	undx =  vctrl->update_ndx;
@@ -245,6 +245,13 @@ int mdp4_lcdc_pipe_commit(void)
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
 	mdp4_stat.overlay_commit[pipe->mixer_num]++;
+
+	if (wait) {
+		if (pipe->ov_blt_addr)
+			mdp4_lcdc_wait4ov(cndx);
+		else
+			mdp4_lcdc_wait4dmap(cndx);
+	}
 
 	return cnt;
 }
@@ -459,8 +466,10 @@ int mdp4_lcdc_on(struct platform_device *pdev)
 		if (ptype < 0)
 			printk(KERN_INFO "%s: format2type failed\n", __func__);
 		pipe = mdp4_overlay_pipe_alloc(ptype, MDP4_MIXER0);
-		if (pipe == NULL)
+		if (pipe == NULL) {
 			printk(KERN_INFO "%s: pipe_alloc failed\n", __func__);
+			return -EBUSY;
+		}
 		pipe->pipe_used++;
 		pipe->mixer_stage  = MDP4_MIXER_STAGE_BASE;
 		pipe->mixer_num  = MDP4_MIXER0;
@@ -507,7 +516,7 @@ int mdp4_lcdc_on(struct platform_device *pdev)
 	mdp4_overlayproc_cfg(pipe);
 
 	mdp4_overlay_reg_flush(pipe, 1);
-	mdp4_mixer_stage_up(pipe);
+	mdp4_mixer_stage_up(pipe, 0);
 
 
 	h_back_porch = var->left_margin;
@@ -636,7 +645,7 @@ int mdp4_lcdc_off(struct platform_device *pdev)
 			vctrl->base_pipe = NULL;
 		} else {
 			
-			mdp4_mixer_stage_down(vctrl->base_pipe);
+			mdp4_mixer_stage_down(vctrl->base_pipe, 1);
 			mdp4_overlay_iommu_pipe_free(
 				vctrl->base_pipe->pipe_ndx, 1);
 		}
@@ -886,13 +895,13 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	mdp4_overlay_mdp_perf_upd(mfd, 1);
 
 	mutex_lock(&mfd->dma->ov_mutex);
-	mdp4_lcdc_pipe_commit();
+	mdp4_lcdc_pipe_commit(cndx, 0);
 	mutex_unlock(&mfd->dma->ov_mutex);
 
 	if (pipe->ov_blt_addr)
-		mdp4_lcdc_wait4ov(0);
+		mdp4_lcdc_wait4ov(cndx);
 	else
-		mdp4_lcdc_wait4dmap(0);
+		mdp4_lcdc_wait4dmap(cndx);
 
 	mdp4_overlay_mdp_perf_upd(mfd, 0);
 }

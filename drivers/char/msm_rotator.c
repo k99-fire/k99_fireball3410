@@ -36,13 +36,6 @@
 #include <mach/msm_subsystem_map.h>
 #include <mach/iommu_domains.h>
 
-#define HTC_ROTATOR_PERFORMANCE
-
-#ifdef HTC_ROTATOR_PERFORMANCE
-#include <linux/pm_qos.h>
-#include <mach/perflock.h>
-#endif 
-
 #define DRIVER_NAME "msm_rotator"
 
 #define MSM_ROTATOR_BASE (msm_rotator_dev->io_base)
@@ -153,12 +146,6 @@ struct msm_rotator_dev {
 	int imem_owner;
 	wait_queue_head_t wq;
 	struct ion_client *client;
-#ifdef HTC_ROTATOR_PERFORMANCE
-	struct pm_qos_request pm_qos_req;
-	struct perf_lock perf_lock_req;
-	struct delayed_work perf_qos_timeout;
-	unsigned int expire_tick;
-#endif 
 	#ifdef CONFIG_MSM_BUS_SCALING
 	uint32_t bus_client_handle;
 	#endif
@@ -168,10 +155,6 @@ struct msm_rotator_dev {
 #define COMPONENT_6BITS 2
 #define COMPONENT_8BITS 3
 
-#ifdef HTC_ROTATOR_PERFORMANCE
-static const unsigned long perf_qos_duration = 300; 
-static const unsigned int perf_qos_expire_tick = 2;
-#endif 
 
 static struct msm_rotator_dev *msm_rotator_dev;
 
@@ -193,8 +176,7 @@ int msm_rotator_iommu_map_buf(int mem_id, int domain,
 		pr_err("ion_import_dma_buf() failed\n");
 		return PTR_ERR(*pihdl);
 	}
-	pr_debug("%s(): ion_hdl %p, ion_fd %d\n", __func__, *pihdl,
-		ion_share_dma_buf(msm_rotator_dev->client, *pihdl));
+	pr_debug("%s(): ion_hdl %p, mem_id=%d\n", __func__, *pihdl, mem_id);
 
 	if (rot_iommu_split_domain) {
 		if (secure) {
@@ -913,12 +895,12 @@ static int msm_rotator_do_rotate(unsigned long arg)
 	struct msm_rotator_data_info info;
 	unsigned int in_paddr, out_paddr;
 	unsigned long src_len, dst_len;
-	int use_imem = 0, rc = 0, s;
+	int use_imem = 0, rc = 0, s, secure_flag = 0;
 	struct file *srcp0_file = NULL, *dstp0_file = NULL;
 	struct file *srcp1_file = NULL, *dstp1_file = NULL;
 	struct ion_handle *srcp0_ihdl = NULL, *dstp0_ihdl = NULL;
 	struct ion_handle *srcp1_ihdl = NULL, *dstp1_ihdl = NULL;
-	int ps0_need, p_need;
+	int ps0_need = 0, p_need;
 	unsigned int in_chroma_paddr = 0, out_chroma_paddr = 0;
 	unsigned int in_chroma2_paddr = 0;
 	struct msm_rotator_img_info *img_info;
@@ -1168,18 +1150,6 @@ static int msm_rotator_do_rotate(unsigned long arg)
 	msm_rotator_dev->processing = 1;
 	iowrite32(0x1, MSM_ROTATOR_START);
 
-#ifdef HTC_ROTATOR_PERFORMANCE
-	if (msm_rotator_dev->img_info[s]->flags & ROTATOR_FLAGS_BIT_PERFORMANCE) {
-		
-		msm_rotator_dev->expire_tick = perf_qos_expire_tick;
-		if (!is_perf_lock_active(&msm_rotator_dev->perf_lock_req)) {
-			perf_lock(&msm_rotator_dev->perf_lock_req);
-			schedule_delayed_work(&msm_rotator_dev->perf_qos_timeout,
-								  msecs_to_jiffies(perf_qos_duration));
-		}
-		pm_qos_update_request(&msm_rotator_dev->pm_qos_req, 100);
-	}
-#endif 
 	wait_event(msm_rotator_dev->wq,
 		   (msm_rotator_dev->processing == 0));
 
@@ -1199,14 +1169,15 @@ do_rotate_exit:
 #endif
 	schedule_delayed_work(&msm_rotator_dev->rot_clk_work, HZ);
 do_rotate_unlock_mutex:
-	put_img(dstp1_file, dstp1_ihdl, ROTATOR_DST_DOMAIN,
-		msm_rotator_dev->img_info[s]->secure);
+	if (s < MAX_SESSIONS)
+		secure_flag = msm_rotator_dev->img_info[s]->secure;
+
+	put_img(dstp1_file, dstp1_ihdl, ROTATOR_DST_DOMAIN, secure_flag);
 	put_img(srcp1_file, srcp1_ihdl, ROTATOR_SRC_DOMAIN, 0);
-	put_img(dstp0_file, dstp0_ihdl, ROTATOR_DST_DOMAIN,
-		msm_rotator_dev->img_info[s]->secure);
+	put_img(dstp0_file, dstp0_ihdl, ROTATOR_DST_DOMAIN, secure_flag);
 
 	
-	if (info.src.flags & MDP_MEMORY_ID_TYPE_FB)
+	if ((info.src.flags & MDP_MEMORY_ID_TYPE_FB) && srcp0_file)
 		fput_light(srcp0_file, ps0_need);
 	else
 		put_img(srcp0_file, srcp0_ihdl, ROTATOR_SRC_DOMAIN, 0);
@@ -1504,25 +1475,6 @@ static long msm_rotator_ioctl(struct file *file, unsigned cmd,
 	}
 }
 
-#ifdef HTC_ROTATOR_PERFORMANCE
-static void rotator_perf_qos_disabler(struct work_struct *work)
-{
-	mutex_lock(&msm_rotator_dev->rotator_lock);
-	if (--msm_rotator_dev->expire_tick) {
-		schedule_delayed_work(&msm_rotator_dev->perf_qos_timeout,
-							   msecs_to_jiffies(perf_qos_duration));
-	} else {
-		if (is_perf_lock_active(&msm_rotator_dev->perf_lock_req)) {
-			perf_unlock(&msm_rotator_dev->perf_lock_req);
-		} else {
-			pr_warn("%s: try to unlock inactive perf lock", __func__);
-		}
-		pm_qos_update_request(&msm_rotator_dev->pm_qos_req, PM_QOS_DEFAULT_VALUE);
-	}
-	mutex_unlock(&msm_rotator_dev->rotator_lock);
-}
-#endif 
-
 static const struct file_operations msm_rotator_fops = {
 	.owner = THIS_MODULE,
 	.open = msm_rotator_open,
@@ -1549,6 +1501,12 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	msm_rotator_dev->last_session_idx = INVALID_SESSION;
 
 	pdata = pdev->dev.platform_data;
+	if (!pdata) {
+		pr_err("%s: Unable to get platform data\n", __func__);
+		rc = -ENODEV;
+		goto error_pdata;
+	}
+
 	number_of_clks = pdata->number_of_clocks;
 	rot_iommu_split_domain = pdata->rot_iommu_split_domain;
 
@@ -1653,6 +1611,11 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	}
 	msm_rotator_dev->io_base = ioremap(res->start,
 					   resource_size(res));
+	if (!msm_rotator_dev->io_base) {
+		printk(KERN_ALERT "%s: ioremap failed\n", DRIVER_NAME);
+		rc = -ENODEV;
+		goto error_get_resource;
+	}
 
 #ifdef CONFIG_MSM_ROTATOR_USE_IMEM
 	if (msm_rotator_dev->imem_clk)
@@ -1708,11 +1671,6 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 		goto error_class_create;
 	}
 
-#ifdef HTC_ROTATOR_PERFORMANCE
-	pm_qos_add_request(&msm_rotator_dev->pm_qos_req, PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
-	perf_lock_init(&msm_rotator_dev->perf_lock_req, TYPE_PERF_LOCK, PERF_LOCK_MEDIUM, "Rotator Perflock");
-	INIT_DELAYED_WORK(&msm_rotator_dev->perf_qos_timeout, rotator_perf_qos_disabler);
-#endif 
 	msm_rotator_dev->device = device_create(msm_rotator_dev->class, NULL,
 						msm_rotator_dev->dev_num, NULL,
 						DRIVER_NAME);
@@ -1757,6 +1715,7 @@ error_pclk:
 		clk_put(msm_rotator_dev->imem_clk);
 error_imem_clk:
 	mutex_destroy(&msm_rotator_dev->imem_lock);
+error_pdata:
 	kfree(msm_rotator_dev);
 	return rc;
 }
@@ -1793,14 +1752,6 @@ static int __devexit msm_rotator_remove(struct platform_device *plat_dev)
 	for (i = 0; i < MAX_SESSIONS; i++)
 		if (msm_rotator_dev->img_info[i] != NULL)
 			kfree(msm_rotator_dev->img_info[i]);
-#ifdef HTC_ROTATOR_PERFORMANCE
-	cancel_delayed_work(&msm_rotator_dev->perf_qos_timeout);
-	if (is_perf_lock_active(&msm_rotator_dev->perf_lock_req)) {
-		perf_unlock(&msm_rotator_dev->perf_lock_req);
-	}
-	pm_qos_update_request(&msm_rotator_dev->pm_qos_req, PM_QOS_DEFAULT_VALUE);
-	pm_qos_remove_request(&msm_rotator_dev->pm_qos_req);
-#endif 
 	kfree(msm_rotator_dev);
 	return 0;
 }
@@ -1821,13 +1772,6 @@ static int msm_rotator_suspend(struct platform_device *dev, pm_message_t state)
 		msm_rotator_dev->rot_clk_state = CLK_SUSPEND;
 	}
 	mutex_unlock(&msm_rotator_dev->rotator_lock);
-#ifdef HTC_ROTATOR_PERFORMANCE
-	cancel_delayed_work(&msm_rotator_dev->perf_qos_timeout);
-	if (is_perf_lock_active(&msm_rotator_dev->perf_lock_req)) {
-		perf_unlock(&msm_rotator_dev->perf_lock_req);
-	}
-	pm_qos_update_request(&msm_rotator_dev->pm_qos_req, PM_QOS_DEFAULT_VALUE);
-#endif 
 	return 0;
 }
 

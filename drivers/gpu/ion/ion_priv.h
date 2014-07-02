@@ -52,6 +52,7 @@ struct ion_buffer {
 	struct rb_node node;
 	struct ion_device *dev;
 	struct ion_heap *heap;
+	struct ion_client *creator;
 	unsigned long flags;
 	size_t size;
 	union {
@@ -116,6 +117,7 @@ struct mem_map_data {
 	unsigned long addr_end;
 	unsigned long size;
 	const char *client_name;
+	const char *creator_name;
 };
 
 #define iommu_map_domain(__m)		((__m)->domain_info[1])

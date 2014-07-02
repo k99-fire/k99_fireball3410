@@ -101,6 +101,9 @@ static int cfg80211_conn_scan(struct wireless_dev *wdev)
 	if (!request)
 		return -ENOMEM;
 
+	
+	request->magic = SCAN_REQUEST_MAGIC;
+
 	if (wdev->conn->params.channel)
 		request->channels[0] = wdev->conn->params.channel;
 	else {
@@ -142,6 +145,9 @@ static int cfg80211_conn_scan(struct wireless_dev *wdev)
 		nl80211_send_scan_start(rdev, wdev->netdev);
 		dev_hold(wdev->netdev);
 	} else {
+		
+		rdev->scan_req->magic = 0;
+
 		rdev->scan_req = NULL;
 		kfree(request);
 	}

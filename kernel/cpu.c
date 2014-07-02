@@ -171,6 +171,7 @@ static int __ref take_cpu_down(void *_param)
 	return 0;
 }
 
+int skip_cpu_offline = 0;
 static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 {
 	int err, nr_calls = 0;
@@ -180,6 +181,9 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 		.mod = mod,
 		.hcpu = hcpu,
 	};
+
+	if (skip_cpu_offline)
+		return -EACCES;
 
 	if (num_online_cpus() == 1)
 		return -EBUSY;

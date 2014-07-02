@@ -384,6 +384,8 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 	mutex_lock(&reboot_mutex);
 	switch (cmd) {
 	case LINUX_REBOOT_CMD_RESTART:
+		printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_RESTART).\n");
+		emergency_remount();
 		kernel_restart(NULL);
 		break;
 
@@ -396,11 +398,15 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 		break;
 
 	case LINUX_REBOOT_CMD_HALT:
+		printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_HALT).\n");
+		emergency_remount();
 		kernel_halt();
 		do_exit(0);
 		panic("cannot halt");
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
+		printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_POWER_OFF).\n");
+		emergency_remount();
 		kernel_power_off();
 		do_exit(0);
 		break;
@@ -411,7 +417,10 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 			break;
 		}
 		buffer[sizeof(buffer) - 1] = '\0';
-
+		if (strlen(buffer) != 0 && strncmp(buffer, "oem-00", 6)) {
+			printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_RESTART2).\n");
+			emergency_remount();
+		}
 		kernel_restart(buffer);
 		break;
 
@@ -1006,15 +1015,16 @@ DECLARE_RWSEM(uts_sem);
 #define override_architecture(name)	0
 #endif
 
-static int override_release(char __user *release, int len)
+static int override_release(char __user *release, size_t len)
 {
 	int ret = 0;
-	char buf[65];
 
 	if (current->personality & UNAME26) {
-		char *rest = UTS_RELEASE;
+		const char *rest = UTS_RELEASE;
+		char buf[65] = { 0 };
 		int ndots = 0;
 		unsigned v;
+		size_t copy;
 
 		while (*rest) {
 			if (*rest == '.' && ++ndots >= 3)
@@ -1024,8 +1034,9 @@ static int override_release(char __user *release, int len)
 			rest++;
 		}
 		v = ((LINUX_VERSION_CODE >> 8) & 0xff) + 40;
-		snprintf(buf, len, "2.6.%u%s", v, rest);
-		ret = copy_to_user(release, buf, len);
+		copy = clamp_t(size_t, len, 1, sizeof(buf));
+		copy = scnprintf(buf, copy, "2.6.%u%s", v, rest);
+		ret = copy_to_user(release, buf, copy + 1);
 	}
 	return ret;
 }

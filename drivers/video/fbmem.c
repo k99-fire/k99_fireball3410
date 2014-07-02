@@ -671,7 +671,7 @@ static struct fb_info *file_fb_info(struct file *file)
 {
 	struct inode *inode = file->f_path.dentry->d_inode;
 	int fbidx = iminor(inode);
-	struct fb_info *info = registered_fb[fbidx];
+	struct fb_info *info = (fbidx < FB_MAX) ? registered_fb[fbidx] : NULL;
 
 	if (info != file->private_data)
 		info = NULL;

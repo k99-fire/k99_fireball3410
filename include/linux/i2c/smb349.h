@@ -144,13 +144,7 @@
 #define SMB349_CHARGE_TIMEOUT_IRQ                               1
 #define SMB349_CHARGE_TIMEOUT_STATUS                            0
 
-
-#define SMB349_CIN_OVER_VOLTAGE_IRQ				7
-#define SMB349_DCIN_OVER_VOLTAGE_STATUS				6
-#define SMB349_DCIN_UNDER_VOLTAGE_IRQ				5
-#define SMB349_DCIN_UNDER_VOLTAGE_STATUS			4
-#define SMB349_AFVC_ACTIVE_IRQ					3
-#define SMB349_AFVC_ACTIVE_STATUS				2
+#define SMB349_DCIN_OVER_VOLTAGE_STATUS				2
 
 #define SMB349_OTG_OVER_CURRENT_LIMIT_IRQ			7
 #define SMB349_OTG_OVER_CURRENT_LIMIT_STATUS            	6
@@ -234,6 +228,10 @@
 
 #define SMB349_USB_MODE		0
 #define SMB349_HC_MODE		1
+
+#define AICL_ENABLE			1
+#define AICL_DISABLE		0
+
 
 #define		FAST_CHARGE_500MA	0x0
 #define		FAST_CHARGE_600MA       0x1
@@ -324,6 +322,7 @@ struct smb349_chg_int_notifier {
 
 struct smb349_platform_data {
 	int chg_susp_gpio;
+	int chg_stat_gpio;
 	int chg_current_ma;
 	int chip_rev;
 #ifdef CONFIG_SUPPORT_DQ_BATTERY
@@ -331,11 +330,13 @@ struct smb349_platform_data {
 #endif
 	int aicl_result_threshold;
 	int dc_input_max;
+	int aicl_on;
 };
 
 struct smb349_charger_batt_param {
 	int max_voltage;
 	int cool_bat_voltage;
+	int warm_bat_voltage;
 };
 int smb349_set_AICL_mode(unsigned int enable);
 int smb349_allow_fast_charging_setting(void);
@@ -354,8 +355,8 @@ int smb349_is_AICL_complete(void);
 int smb349_is_AICL_enabled(void);
 int smb349_is_charger_bit_low_active(void);
 int smb349_is_charger_error(void);
-int smb349_reset_max_chg_vol(enum htc_extchg_event_type main_event);
-int smb349_is_charging_enabled(void);
+int smb349_adjust_max_chg_vol(enum htc_extchg_event_type main_event);
+int smb349_is_charging_enabled(int *result);
 int smb349_is_batt_temp_fault_disable_chg(int *result);
 int smb349_get_i2c_slave_id(void);
 int smb349_is_hc_mode(void);
@@ -363,10 +364,12 @@ int smb349_is_usbcs_register_mode(void);
 int smb349_masked_write(int reg, u8 mask, u8 val);
 int smb349_not_allow_charging_cycle_end(void);
 int smb349_enable_pwrsrc(bool enable);
+int smb349_set_hsml_target_ma(int target_ma);
 int smb349_set_pwrsrc_and_charger_enable(enum htc_power_source_type src, bool chg_enable, bool pwrsrc_enable);
 int smb349_set_hc_mode(unsigned int enable);
 int smb349_switch_usbcs_mode(int mode);
 int smb349_limit_charge_enable(bool enable);
+int smb349_is_batt_charge_enable(void);
 int smb349_get_charging_src(int *result);
 int smb349_get_charging_enabled(int *result);
 int smb349_is_charger_overvoltage(int* result);
