@@ -14,11 +14,6 @@
 #define S5K3H2YX_READ_FLIP 0x0002			
 #define S5K3H2YX_READ_MIRROR_FLIP 0x0003	
 
-#define S5K3H2_REG_DIGITAL_GAIN_GREEN_R 0x020E
-#define S5K3H2_REG_DIGITAL_GAIN_RED 0x0210
-#define S5K3H2_REG_DIGITAL_GAIN_BLUE 0x0212
-#define S5K3H2_REG_DIGITAL_GAIN_GREEN_B 0x0214
-
 #define DEFAULT_VCM_MAX 73
 #define DEFAULT_VCM_MED 35
 #define DEFAULT_VCM_MIN 8
@@ -884,13 +879,15 @@ static struct msm_sensor_id_info_t s5k3h2yx_id_info = {
 	.sensor_id_reg_addr = 0x0,
 	.sensor_id = 0x382B,
 };
+#define SENSOR_REGISTER_MAX_LINECOUNT 0xffff
+#define SENSOR_VERT_OFFSET 16
 
 static struct msm_sensor_exp_gain_info_t s5k3h2yx_exp_gain_info = {
 	.coarse_int_time_addr = 0x202,
 	.global_gain_addr = 0x204,
-	.vert_offset = 16,
+	.vert_offset = SENSOR_VERT_OFFSET,
 	.min_vert = 4,  
-	.sensor_max_linecount = 65519,  
+	.sensor_max_linecount = SENSOR_REGISTER_MAX_LINECOUNT-SENSOR_VERT_OFFSET,  
 };
 
 static uint32_t vcm_clib;
@@ -1325,7 +1322,7 @@ int32_t s5k3h2yx_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	}
 
 	if (!sdata->use_rawchip) {
-		rc = msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
+		rc = msm_camio_clk_enable(sdata,CAMIO_CAM_MCLK_CLK);
 		if (rc < 0) {
 			pr_err("%s: msm_camio_sensor_clk_on failed:%d\n",
 			 __func__, rc);
@@ -1356,7 +1353,7 @@ enable_sensor_power_up_failed:
 	else
 		sdata->camera_power_off();
 enable_power_on_failed:
-	msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
+	msm_camio_clk_disable(sdata,CAMIO_CAM_MCLK_CLK);
 enable_mclk_failed:
 	return rc;
 }
@@ -1388,7 +1385,7 @@ int32_t s5k3h2yx_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s msm_sensor_power_down failed\n", __func__);
 
 	if (!sdata->use_rawchip) {
-		msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
+		msm_camio_clk_disable(sdata,CAMIO_CAM_MCLK_CLK);
 		if (rc < 0)
 			pr_err("%s: msm_camio_sensor_clk_off failed:%d\n",
 				 __func__, rc);
@@ -1555,26 +1552,6 @@ get_done:
 	return 0;
 
 }
-/* HTC_END*/
-
-int32_t s5k3h2_set_dig_gain(struct msm_sensor_ctrl_t *s_ctrl, uint16_t dig_gain){
-
-	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
-		S5K3H2_REG_DIGITAL_GAIN_GREEN_R, dig_gain,
-		MSM_CAMERA_I2C_BYTE_DATA);
-	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
-		S5K3H2_REG_DIGITAL_GAIN_RED, dig_gain,
-		MSM_CAMERA_I2C_BYTE_DATA);
-	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
-		S5K3H2_REG_DIGITAL_GAIN_BLUE, dig_gain,
-		MSM_CAMERA_I2C_BYTE_DATA);
-	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
-		S5K3H2_REG_DIGITAL_GAIN_GREEN_B, dig_gain,
-		MSM_CAMERA_I2C_BYTE_DATA);
-	return 0;
-}
-
-
 static struct msm_sensor_fn_t s5k3h2yx_func_tbl = {
 	.sensor_start_stream = msm_sensor_start_stream,
 	.sensor_stop_stream = msm_sensor_stop_stream,
@@ -1583,7 +1560,6 @@ static struct msm_sensor_fn_t s5k3h2yx_func_tbl = {
 	.sensor_set_fps = msm_sensor_set_fps,
 	.sensor_write_exp_gain_ex = msm_sensor_write_exp_gain1_ex,
 	.sensor_write_snapshot_exp_gain_ex = msm_sensor_write_exp_gain1_ex,
-	.sensor_set_dig_gain = s5k3h2_set_dig_gain,
 #ifdef CONFIG_ARCH_MSM8X60
 	.sensor_setting = msm_sensor_setting1,
 #else

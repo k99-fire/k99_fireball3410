@@ -381,6 +381,7 @@ static struct msm_actuator_ctrl_t imx175_act_t = {
 		.a_power_down = imx175_actuator_af_power_down,
 		.a_create_subdevice = imx175_act_create_subdevice,
 		.a_config = imx175_act_config,
+		.is_af_infinity_supported = 1,
 	},
 
 	.i2c_client = {

@@ -5,6 +5,7 @@
  * Copyright (C) 2008 by David Brownell
  * Copyright (C) 2008 by Nokia Corporation
  * Copyright (C) 2009 by Samsung Electronics
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  * Author: Michal Nazarewicz (mina86@mina86.com)
  *
  * This software is distributed under the terms of the GNU General
@@ -12,11 +13,12 @@
  * either version 2 of that License or (at your option) any later version.
  */
 
-/* #define VERBOSE_DEBUG */
 
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
+#include <linux/usb/android_composite.h>
+#include <mach/usb_gadget_xport.h>
 
 #include "u_serial.h"
 #include "gadget_chips.h"
@@ -43,6 +45,7 @@ struct f_acm {
 	struct gserial			port;
 	u8				ctrl_id, data_id;
 	u8				port_num;
+	enum transport_type		transport;
 
 	u8				pending;
 
@@ -72,7 +75,7 @@ struct f_acm {
 #define ACM_CTRL_DSR		(1 << 1)
 #define ACM_CTRL_DCD		(1 << 0)
 };
-
+static struct f_acm *_f_acm;
 static inline struct f_acm *func_to_acm(struct usb_function *f)
 {
 	return container_of(f, struct f_acm, port.func);
@@ -82,8 +85,64 @@ static inline struct f_acm *port_to_acm(struct gserial *p)
 {
 	return container_of(p, struct f_acm, port);
 }
+static int acm_port_connect(struct f_acm *acm)
+{
+	unsigned port_num;
 
-/*-------------------------------------------------------------------------*/
+	port_num = gserial_ports[acm->port_num].client_port_num;
+
+
+	pr_debug("%s: transport:%s f_acm:%p gserial:%p port_num:%d cl_port_no:%d\n",
+			__func__, xport_to_str(acm->transport),
+			acm, &acm->port, acm->port_num, port_num);
+
+	switch (acm->transport) {
+	case USB_GADGET_XPORT_TTY:
+		gserial_connect(&acm->port, port_num);
+		break;
+	case USB_GADGET_XPORT_SDIO:
+		gsdio_connect(&acm->port, port_num);
+		break;
+	case USB_GADGET_XPORT_SMD:
+		gsmd_connect(&acm->port, port_num);
+		break;
+	default:
+		pr_err("%s: Un-supported transport: %s\n", __func__,
+				xport_to_str(acm->transport));
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static int acm_port_disconnect(struct f_acm *acm)
+{
+	unsigned port_num;
+
+	port_num = gserial_ports[acm->port_num].client_port_num;
+
+	pr_debug("%s: transport:%s f_acm:%p gserial:%p port_num:%d cl_pno:%d\n",
+			__func__, xport_to_str(acm->transport),
+			acm, &acm->port, acm->port_num, port_num);
+
+	switch (acm->transport) {
+	case USB_GADGET_XPORT_TTY:
+		gserial_disconnect(&acm->port);
+		break;
+	case USB_GADGET_XPORT_SDIO:
+		gsdio_disconnect(&acm->port, port_num);
+		break;
+	case USB_GADGET_XPORT_SMD:
+		gsmd_disconnect(&acm->port, port_num);
+		break;
+	default:
+		pr_err("%s: Un-supported transport:%s\n", __func__,
+				xport_to_str(acm->transport));
+		return -ENODEV;
+	}
+
+	return 0;
+}
 
 /* notification endpoint uses smallish and infrequent fixed-size messages */
 
@@ -284,7 +343,7 @@ static struct usb_string acm_string_defs[] = {
 	[ACM_CTRL_IDX].s = "CDC Abstract Control Model (ACM)",
 	[ACM_DATA_IDX].s = "CDC ACM Data",
 	[ACM_IAD_IDX ].s = "CDC Serial",
-	{  /* ZEROES END LIST */ },
+	{   },
 };
 
 static struct usb_gadget_strings acm_string_table = {
@@ -297,7 +356,30 @@ static struct usb_gadget_strings *acm_strings[] = {
 	NULL,
 };
 
-/*-------------------------------------------------------------------------*/
+#ifdef CONFIG_PASCAL_DETECT
+
+struct switch_dev kddi_switch = {
+	.name = "kddi",
+};
+atomic_t pascal_enable = ATOMIC_INIT(0);
+
+static void kddi_pascal_connect_notify(int connect_status)
+{
+
+	printk(KERN_INFO "%s: %d\n", __func__, connect_status);
+
+	if (connect_status == 0 && atomic_read(&pascal_enable)) {
+		android_switch_function(0x1);
+		switch_set_state(&kddi_switch, 0);
+	}
+}
+
+static struct t_usb_status_notifier pascal_connect_status_notifier = {
+	.name = "pascal_connect_status",
+	.func = kddi_pascal_connect_notify,
+};
+#endif
+
 
 /* ACM control ... data handling is delegated to tty library code.
  * The main task of this function is to activate and deactivate
@@ -392,6 +474,11 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		 * that bit, we should return to that no-flow state.
 		 */
 		acm->port_handshake_bits = w_value;
+		if (acm->port.notify_modem) {
+			unsigned port_num = gserial_ports[acm->port_num].client_port_num;
+
+			acm->port.notify_modem(&acm->port, port_num, w_value);
+		}
 		break;
 
 	default:
@@ -431,16 +518,17 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			usb_ep_disable(acm->notify);
 		} else {
 			VDBG(cdev, "init acm ctrl interface %d\n", intf);
-			if (config_ep_by_speed(cdev->gadget, f, acm->notify))
-				return -EINVAL;
 		}
+		if (config_ep_by_speed(cdev->gadget, f, acm->notify))
+			return -EINVAL;
+
 		usb_ep_enable(acm->notify);
 		acm->notify->driver_data = acm;
 
 	} else if (intf == acm->data_id) {
 		if (acm->port.in->driver_data) {
 			DBG(cdev, "reset acm ttyGS%d\n", acm->port_num);
-			gserial_disconnect(&acm->port);
+			acm_port_disconnect(acm);
 		}
 		if (!acm->port.in->desc || !acm->port.out->desc) {
 			DBG(cdev, "activate acm ttyGS%d\n", acm->port_num);
@@ -453,7 +541,16 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 				return -EINVAL;
 			}
 		}
-		gserial_connect(&acm->port, acm->port_num);
+		if (config_ep_by_speed(cdev->gadget, f,
+				acm->port.in) ||
+			config_ep_by_speed(cdev->gadget, f,
+				acm->port.out)) {
+			acm->port.in->desc = NULL;
+			acm->port.out->desc = NULL;
+			return -EINVAL;
+		}
+
+		acm_port_connect(acm);
 
 	} else
 		return -EINVAL;
@@ -467,7 +564,7 @@ static void acm_disable(struct usb_function *f)
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	DBG(cdev, "acm ttyGS%d deactivated\n", acm->port_num);
-	gserial_disconnect(&acm->port);
+	acm_port_disconnect(acm);
 	usb_ep_disable(acm->notify);
 	acm->notify->driver_data = NULL;
 }
@@ -598,7 +695,15 @@ static int acm_send_break(struct gserial *port, int duration)
 	return acm_notify_serial_state(acm);
 }
 
-/*-------------------------------------------------------------------------*/
+static int acm_send_modem_ctrl_bits(struct gserial *port, int ctrl_bits)
+{
+	struct f_acm *acm = port_to_acm(port);
+
+	acm->serial_state = ctrl_bits;
+
+	return acm_notify_serial_state(acm);
+}
+
 
 /* ACM function driver setup/binding */
 static int
@@ -678,6 +783,8 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 
 		/* copy descriptors */
 		f->hs_descriptors = usb_copy_descriptors(acm_hs_function);
+		if (!f->hs_descriptors)
+			goto fail;
 	}
 	if (gadget_is_superspeed(c->cdev->gadget)) {
 		acm_ss_in_desc.bEndpointAddress =
@@ -700,6 +807,11 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 
 fail:
+	if (f->hs_descriptors)
+		usb_free_descriptors(f->hs_descriptors);
+	if (f->descriptors)
+		usb_free_descriptors(f->descriptors);
+
 	if (acm->notify_req)
 		gs_free_req(acm->notify, acm->notify_req);
 
@@ -727,6 +839,7 @@ acm_unbind(struct usb_configuration *c, struct usb_function *f)
 		usb_free_descriptors(f->ss_descriptors);
 	usb_free_descriptors(f->descriptors);
 	gs_free_req(acm->notify, acm->notify_req);
+	kfree(acm->port.func.name);
 	kfree(acm);
 }
 
@@ -793,12 +906,18 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 	spin_lock_init(&acm->lock);
 
 	acm->port_num = port_num;
+	acm->transport = gserial_ports[port_num].transport;
 
 	acm->port.connect = acm_connect;
 	acm->port.disconnect = acm_disconnect;
 	acm->port.send_break = acm_send_break;
+	acm->port.send_modem_ctrl_bits = acm_send_modem_ctrl_bits;
 
-	acm->port.func.name = "acm";
+	acm->port.func.name = kasprintf(GFP_KERNEL, "acm%u", port_num + 1);
+	if (!acm->port.func.name) {
+		kfree(acm);
+		return -ENOMEM;
+	}
 	acm->port.func.strings = acm_strings;
 	/* descriptors are per-instance copies */
 	acm->port.func.bind = acm_bind;
@@ -807,8 +926,15 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 	acm->port.func.setup = acm_setup;
 	acm->port.func.disable = acm_disable;
 
+	_f_acm = acm;
+
+#ifdef CONFIG_PASCAL_DETECT
+	usb_register_notifier(&pascal_connect_status_notifier);
+#endif
+
 	status = usb_add_function(c, &acm->port.func);
 	if (status)
 		kfree(acm);
 	return status;
 }
+

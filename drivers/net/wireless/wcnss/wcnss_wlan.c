@@ -426,7 +426,12 @@ static int wcnss_node_open(struct inode *inode, struct file *file)
 {
 	struct platform_device *pdev;
 
-	pr_info(DEVICE " triggered by userspace\n");
+	pr_info(DEVICE " triggered by userspace (%p)\n", penv);
+
+	if (penv == NULL) {
+		printk("penv == NULL");
+		return ENODEV;
+	}
 
 	pdev = penv->pdev;
 	return wcnss_trigger_config(pdev);
