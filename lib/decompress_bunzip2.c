@@ -165,7 +165,7 @@ static int INIT get_next_block(struct bunzip_data *bd)
 	}
 	symCount = symTotal+2;
 	for (j = 0; j < groupCount; j++) {
-		unsigned char length[MAX_SYMBOLS], temp[MAX_HUFCODE_BITS+1];
+		unsigned char length[MAX_SYMBOLS] = {0}, temp[MAX_HUFCODE_BITS+1] = {0};
 		int	minLen,	maxLen, pp;
 		t = get_bits(bd, 5)-1;
 		for (i = 0; i < symCount; i++) {

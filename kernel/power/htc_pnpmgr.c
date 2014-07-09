@@ -72,6 +72,7 @@ static ssize_t _name##_store					\
 }
 
 static char activity_buf[MAX_BUF];
+static char non_activity_buf[MAX_BUF];
 static char media_mode_buf[MAX_BUF];
 static int app_timeout_expired;
 
@@ -83,20 +84,24 @@ define_string_show(activity_trigger, activity_buf);
 define_string_store(activity_trigger, activity_buf, null_cb);
 power_attr(activity_trigger);
 
+define_string_show(non_activity_trigger, non_activity_buf);
+define_string_store(non_activity_trigger, non_activity_buf, null_cb);
+power_attr(non_activity_trigger);
+
 define_string_show(media_mode, media_mode_buf);
 define_string_store(media_mode, media_mode_buf, null_cb);
 power_attr(media_mode);
 
-static int thermal_c0_value;
+static int thermal_c0_value = 9999999;
 #if (CONFIG_NR_CPUS >= 2)
-static int thermal_c1_value;
+static int thermal_c1_value = 9999999;
 #if (CONFIG_NR_CPUS == 4)
-static int thermal_c2_value;
-static int thermal_c3_value;
+static int thermal_c2_value = 9999999;
+static int thermal_c3_value = 9999999;
 #endif
 #endif
-static int thermal_final_value;
-static int thermal_g0_value;
+static int thermal_final_value = 9999999;
+static int thermal_g0_value = 999999999;
 static int thermal_batt_value;
 static int data_throttling_value;
 
@@ -236,6 +241,31 @@ power_attr(perflock_scaling_max);
 power_attr(perflock_scaling_min);
 #endif
 
+#ifdef CONFIG_QSC_MODEM
+static bool mdm_lock_value = 1;
+#else
+static bool mdm_lock_value = 0;
+#endif
+
+ssize_t
+mdm_lock_show(struct kobject *kobj, struct kobj_attribute *attr,
+                char *buf)
+{
+	int ret = 0;
+
+	ret = sprintf(buf, "%d", mdm_lock_value);
+	return ret;
+}
+
+define_int_store(mdm_lock, mdm_lock_value, null_cb);
+power_attr(mdm_lock);
+
+void mdm_lock(bool value)
+{
+	mdm_lock_value = value;
+	sysfs_notify(cpufreq_kobj, NULL, "mdm_lock");
+}
+
 #ifdef CONFIG_HOTPLUG_CPU
 ssize_t
 cpu_hotplug_show(struct kobject *kobj, struct kobj_attribute *attr,
@@ -249,6 +279,7 @@ ssize_t
 cpu_hotplug_store(struct kobject *kobj, struct kobj_attribute *attr,
 		const char *buf, size_t n)
 {
+	sysfs_notify(hotplug_kobj, NULL, "cpu_hotplug");
 	return 0;
 }
 power_attr(cpu_hotplug);
@@ -281,6 +312,7 @@ static struct attribute *cpufreq_g[] = {
 	&perflock_scaling_max_attr.attr,
 	&perflock_scaling_min_attr.attr,
 #endif
+	&mdm_lock_attr.attr,
 	NULL,
 };
 
@@ -352,6 +384,7 @@ power_attr(app_timeout);
 
 static struct attribute *apps_g[] = {
 	&activity_trigger_attr.attr,
+	&non_activity_trigger_attr.attr,
 	&media_mode_attr.attr,
 	&app_timeout_attr.attr,
 	NULL,

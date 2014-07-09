@@ -3866,6 +3866,12 @@ static void migrate_tasks(unsigned int dead_cpu)
 		if (rq->nr_running == 1)
 			break;
 
+
+		if ((rq->cfs.nr_running == 0) && (rq->rt.rt_nr_running == 0)) {
+			requeue_rt_rq_tasks(rq);
+			continue;
+		}
+
 		next = pick_next_task(rq);
 		BUG_ON(!next);
 		next->sched_class->put_prev_task(rq, next);
@@ -5426,6 +5432,7 @@ int in_sched_functions(unsigned long addr)
 
 #ifdef CONFIG_CGROUP_SCHED
 struct task_group root_task_group;
+LIST_HEAD(task_groups);
 #endif
 
 DECLARE_PER_CPU(cpumask_var_t, load_balance_tmpmask);
