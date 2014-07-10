@@ -343,7 +343,7 @@ void *pil_get(const char *name)
 	struct pil_device *pil;
 	struct pil_device *pil_d;
 	void *retval;
-#ifdef CONFIG_MSM8960_ONLY
+#if defined(CONFIG_MSM8960_ONLY) || defined(CONFIG_MSM8930_ONLY)
 	static int modem_initialized = 0;
 	int loop_count = 0;
 #endif
@@ -365,7 +365,7 @@ void *pil_get(const char *name)
 		goto err_depends;
 	}
 
-#ifdef CONFIG_MSM8960_ONLY
+#if defined(CONFIG_MSM8960_ONLY) || defined(CONFIG_MSM8930_ONLY)
 	if (!strcmp("modem", name)) {
 		while (unlikely(!modem_initialized && strcmp("rmt_storage", current->comm) && loop_count++ < 10)) {
 			
@@ -378,7 +378,7 @@ void *pil_get(const char *name)
 	if (!pil->count) {
 		if (!strcmp("modem", name)) {
 			printk("%s: %s(%d) for %s\n", __func__, current->comm, current->pid, name);
-#ifdef CONFIG_MSM8960_ONLY
+#if defined(CONFIG_MSM8960_ONLY) || defined(CONFIG_MSM8930_ONLY)
 			modem_initialized = 1;
 #endif
 		}

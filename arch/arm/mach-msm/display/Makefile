@@ -15,6 +15,6 @@ obj-$(CONFIG_MACH_ELITE) += board-elite-display.o board-elite-panel.o
 obj-$(CONFIG_MACH_JET) += board-jet-panel.o
 obj-$(CONFIG_MACH_JEWEL_DD) += board-jel_dd-panel.o
 obj-$(CONFIG_MACH_EVITA_UTL) += board-evita_utl-display.o board-evita_utl-panel.o
-obj-$(CONFIG_MACH_FIGHTER) += board-fighter-panel.o board-fighter-display.o
+obj-$(CONFIG_MACH_FIGHTER) += board-fighter-panel.o
 obj-$(CONFIG_MACH_VALENTE_WX) += board-valente_wx-panel.o board-valente_wx-display.o
 obj-$(CONFIG_MACH_VALENTE_WX_C9) += board-valente_wx-panel.o board-valente_wx-display.o

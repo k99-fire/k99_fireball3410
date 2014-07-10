@@ -1878,6 +1878,8 @@ void enable_ic_cabc(int cabc, bool dim_on, struct msm_fb_data_type *mfd)
 	cmdreq.cmds = enable_dim;
 	cmdreq.cmds_cnt = ARRAY_SIZE(enable_dim);
 	cmdreq.flags = CMD_REQ_COMMIT;
+	if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+	    cmdreq.flags |= CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
 	mipi_dsi_cmdlist_put(&cmdreq);
@@ -1974,7 +1976,7 @@ static void fighter_self_refresh_switch(int on)
 
 		cmdreq.cmds = fighter_cmd_to_video;
 		cmdreq.cmds_cnt = ARRAY_SIZE(fighter_cmd_to_video);
-		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -2006,12 +2008,16 @@ static void fighter_display_on(struct msm_fb_data_type *mfd)
 		cmdreq.cmds = sony_orise9608a_panel_display_on;
 		cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_panel_display_on);
 		cmdreq.flags = CMD_REQ_COMMIT;
+			if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			    cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 	} else {
 		cmdreq.cmds = novatek_panel_display_on;
 		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_panel_display_on);
 		cmdreq.flags = CMD_REQ_COMMIT;
+			if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			    cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 	}
@@ -2034,6 +2040,8 @@ static void fighter_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 		cmdreq.cmds = disable_dim;
 		cmdreq.cmds_cnt = ARRAY_SIZE(disable_dim);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+		    cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -2042,6 +2050,8 @@ static void fighter_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	cmdreq.cmds = novatek_cmd_backlight_cmds;
 	cmdreq.cmds_cnt = ARRAY_SIZE(novatek_cmd_backlight_cmds);
 	cmdreq.flags = CMD_REQ_COMMIT;
+	if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+	    cmdreq.flags |= CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
 	mipi_dsi_cmdlist_put(&cmdreq);
@@ -2088,6 +2098,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = novatek_cmd_on_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_cmd_on_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2097,6 +2109,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = novatek_c2_cmd_on_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_c2_cmd_on_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2106,6 +2120,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = novatek_c3_cmd_on_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(novatek_c3_cmd_on_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2115,6 +2131,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = lg_novatek_cmd_on_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(lg_novatek_cmd_on_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2124,6 +2142,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = lg_novatek_c2_cmd_on_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(lg_novatek_c2_cmd_on_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2133,6 +2153,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = lg_novatek_mp_cmd_on_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(lg_novatek_mp_cmd_on_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2142,6 +2164,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = sony_orise9608a_panel_cmd_mode_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_panel_cmd_mode_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2151,6 +2175,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = sony_orise9608a_c1_1_panel_cmd_mode_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_c1_1_panel_cmd_mode_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2160,6 +2186,8 @@ static int fighter_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = sony_orise9608a_mp_panel_cmd_mode_cmds;
 				cmdreq.cmds_cnt = ARRAY_SIZE(sony_orise9608a_mp_panel_cmd_mode_cmds);
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+				    cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);	
@@ -2198,6 +2226,8 @@ static int fighter_lcd_off(struct platform_device *pdev)
 		cmdreq.cmds = novatek_display_off_cmds;
 		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_display_off_cmds);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+		    cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -2205,6 +2235,8 @@ static int fighter_lcd_off(struct platform_device *pdev)
 		cmdreq.cmds = novatek_display_off_lg_cmds;
 		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_display_off_lg_cmds);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+		    cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -2384,6 +2416,7 @@ static int mipi_cmd_novatek_blue_qhd_pt_init(void)
 	pinfo.bl_max = 255;
 	pinfo.bl_min = 1;
 	pinfo.fb_num = 2;
+	pinfo.camera_backlight = 185;
 	pinfo.clk_rate = 482000000;
 	pinfo.read_pointer = 275;
 	
@@ -2402,6 +2435,7 @@ static int mipi_cmd_novatek_blue_qhd_pt_init(void)
 	pinfo.mipi.stream = 0;	/* dma_p */
 	pinfo.mipi.mdp_trigger = DSI_CMD_TRIGGER_NONE;
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
+	pinfo.mipi.frame_rate = 57;
 #ifdef CONFIG_FB_MSM_SELF_REFRESH
 	fighter_panel_data.self_refresh_switch = NULL; 
 #endif

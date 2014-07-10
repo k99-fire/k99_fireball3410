@@ -325,7 +325,6 @@ extern struct rpm_regulator_platform_data msm_rpm_regulator_pdata __devinitdata;
 
 void jet_lcd_id_power(int pull);
 
-void __init jet_allocate_fb_regions(void);
 int __init jet_init_keypad(void);
 int __init jet_gpiomux_init(void);
 extern struct msm_camera_board_info jet_camera_board_info;

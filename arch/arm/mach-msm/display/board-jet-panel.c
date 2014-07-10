@@ -3364,6 +3364,7 @@ static struct dsi_cmd_desc *cabc_cmds = cabc_off;
 
 void enable_ic_cabc(int cabc, bool dim_on, struct msm_fb_data_type *mfd)
 {
+	
 	if (dim_on)
 		dim_cmds = enable_dim;
 	if (cabc == 1)
@@ -3372,15 +3373,16 @@ void enable_ic_cabc(int cabc, bool dim_on, struct msm_fb_data_type *mfd)
 		cabc_cmds = cabc_on_still;
 	else if (cabc == 3)
 		cabc_cmds = cabc_on_moving;
-	
+
 	cmdreq.cmds = enable_dim;
 	cmdreq.cmds_cnt = ARRAY_SIZE(enable_dim);
 	cmdreq.flags = CMD_REQ_COMMIT;
+	if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+		cmdreq.flags |= CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
 	mipi_dsi_cmdlist_put(&cmdreq);
 	PR_DISP_INFO("%s: enable dimming and cabc\n", __func__);
-
 }
 #endif
 #ifdef READ_ID
@@ -3468,7 +3470,7 @@ static void jet_self_refresh_switch(int on)
 
 		cmdreq.cmds = cmd_to_videos;
 		cmdreq.cmds_cnt = cmd_to_videos_cnt;
-		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -3495,6 +3497,8 @@ static void jet_display_on(struct msm_fb_data_type *mfd)
 		cmdreq.cmds = auo_display_on_cmds;
 		cmdreq.cmds_cnt = ARRAY_SIZE(auo_display_on_cmds);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put (&cmdreq);
@@ -3502,6 +3506,8 @@ static void jet_display_on(struct msm_fb_data_type *mfd)
 		cmdreq.cmds = sony_display_on_cmds;
 		cmdreq.cmds_cnt = ARRAY_SIZE(sony_display_on_cmds);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put (&cmdreq);
@@ -3516,23 +3522,14 @@ static void jet_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	if (bl_level_prevset == mfd->bl_level)
 		return;
 
-
-#if 0
-	if (mdp4_overlay_dsi_state_get() <= ST_DSI_SUSPEND) {
-		mutex_unlock(&mfd->dma->ov_mutex);
-		mutex_unlock(&cmdlock);
-		return;
-	}
-#endif
-
-	
-
 	led_pwm1[1] = jet_shrink_pwm(mfd->bl_level);
 
 	if (mfd->bl_level == 0) {
 		cmdreq.cmds = disable_dim;
 		cmdreq.cmds_cnt = ARRAY_SIZE(disable_dim);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -3541,6 +3538,8 @@ static void jet_mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	cmdreq.cmds = cmd_backlight_cmds;
 	cmdreq.cmds_cnt = cmd_backlight_cmds_count;
 	cmdreq.flags = CMD_REQ_COMMIT;
+	if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+		cmdreq.flags |= CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
 	mipi_dsi_cmdlist_put(&cmdreq);
@@ -3568,6 +3567,8 @@ static int jet_lcd_on(struct platform_device *pdev)
 		cmdreq.cmds = nvt_LowTemp_wrkr_enter;
 		cmdreq.cmds_cnt = ARRAY_SIZE(nvt_LowTemp_wrkr_enter);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -3575,6 +3576,8 @@ static int jet_lcd_on(struct platform_device *pdev)
 		cmdreq.cmds = nvt_LowTemp_wrkr_exit;
 		cmdreq.cmds_cnt = ARRAY_SIZE(nvt_LowTemp_wrkr_exit);
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
@@ -3610,6 +3613,8 @@ static int jet_lcd_on(struct platform_device *pdev)
 				cmdreq.cmds = command_on_cmds;
 				cmdreq.cmds_cnt = command_on_cmds_count;
 				cmdreq.flags = CMD_REQ_COMMIT;
+				if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+					cmdreq.flags |= CMD_CLK_CTRL;
 				cmdreq.rlen = 0;
 				cmdreq.cb = NULL;
 				mipi_dsi_cmdlist_put(&cmdreq);
@@ -3641,21 +3646,19 @@ static int jet_lcd_off(struct platform_device *pdev)
 	if (!mipi_lcd_on)
 		return 0;
 
-	
-	
 	if (panel_type != PANEL_ID_NONE) {
 		PR_DISP_INFO("%s: %s\n", __func__, ptype);
 
 		cmdreq.cmds = display_off_cmds;
 		cmdreq.cmds_cnt = display_off_cmds_count;
 		cmdreq.flags = CMD_REQ_COMMIT;
+		if (mfd && mfd->panel_info.type == MIPI_CMD_PANEL)
+			cmdreq.flags |= CMD_CLK_CTRL;
 		cmdreq.rlen = 0;
 		cmdreq.cb = NULL;
 		mipi_dsi_cmdlist_put(&cmdreq);
 	} else
 		PR_DISP_ERR("%s: panel_type is not supported!(%d)", __func__, panel_type);
-
-	
 
 	bl_level_prevset = 0;
 	mipi_lcd_on = 0;
@@ -3846,6 +3849,7 @@ static int mipi_cmd_novatek_blue_qhd_pt_init(void)
 	pinfo.bl_max = 255;
 	pinfo.bl_min = 1;
 	pinfo.fb_num = 2;
+	pinfo.camera_backlight = 185;
 	pinfo.clk_rate = 482000000;
 	pinfo.lcd.vsync_enable = TRUE;
 	pinfo.lcd.hw_vsync_mode = TRUE;
@@ -3958,9 +3962,11 @@ static int mipi_video_auo_hd720p_init(void)
 	pinfo.bl_max = 255;
 	pinfo.bl_min = 1;
 	pinfo.fb_num = 2;
+	pinfo.camera_backlight = 185;
 	
 	
 	pinfo.clk_rate = 569000000;
+	pinfo.read_pointer = 275;
 
 	pinfo.mipi.vc = 0;
 	pinfo.mipi.rgb_swap = DSI_RGB_SWAP_RGB;
@@ -4104,7 +4110,9 @@ static int mipi_video_sony_hd720p_init(void)
 	pinfo.bl_max = 255;
 	pinfo.bl_min = 1;
 	pinfo.fb_num = 2;
+	pinfo.camera_backlight = 185;
 	pinfo.clk_rate = 569000000;
+	pinfo.read_pointer = 275;
 
 	pinfo.mipi.vc = 0;
 	pinfo.mipi.rgb_swap = DSI_RGB_SWAP_RGB;
@@ -4116,7 +4124,7 @@ static int mipi_video_sony_hd720p_init(void)
 	pinfo.mipi.t_clk_pre = 0x21;
 	pinfo.mipi.stream = 0;	
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
-	pinfo.mipi.frame_rate = 59; 
+	pinfo.mipi.frame_rate = 57;
 	pinfo.mipi.dsi_phy_db = &nova_dsi_video_mode_phy_db;
 
 	ret = mipi_jet_device_register(&pinfo, MIPI_DSI_PRIM,

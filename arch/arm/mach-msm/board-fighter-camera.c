@@ -234,10 +234,8 @@ static struct regulator *reg_8921_lvs6;
 static uint16_t msm_cam_gpio_tbl[] = {
 	FIGHTER_GPIO_CAM_MCLK0, /*CAMIF_MCLK*/
 	FIGHTER_GPIO_CAM_MCLK1,
-#if 0
 	FIGHTER_GPIO_CAM_I2C_DAT, /*CAMIF_I2C_DATA*/
 	FIGHTER_GPIO_CAM_I2C_CLK, /*CAMIF_I2C_CLK*/
-#endif
 };
 
 static struct msm_camera_gpio_conf gpio_conf = {

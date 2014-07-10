@@ -32,7 +32,6 @@
 #include <linux/bma250.h>
 #include <linux/slimbus/slimbus.h>
 #include <linux/bootmem.h>
-#include <linux/msm_kgsl.h>
 #ifdef CONFIG_ANDROID_PMEM
 #include <linux/android_pmem.h>
 #endif
@@ -87,6 +86,7 @@
 #include <mach/msm_rtb.h>
 #include <mach/msm_cache_dump.h>
 #include <mach/scm.h>
+#include <mach/kgsl.h>
 #include <linux/fmem.h>
 
 #include "timer.h"
@@ -131,6 +131,7 @@
 #include "../../../../drivers/video/msm/mdp.h"
 
 #define HW_VER_ID_VIRT	(MSM_TLMM_BASE + 0x00002054)
+
 extern int panel_type;
 static unsigned int engineerid;
 
@@ -790,6 +791,42 @@ static int msm8960_change_memory_power(u64 start, u64 size,
 int set_two_phase_freq(int cpufreq);
 #endif
 
+#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
+#define MSM_FB_PRIM_BUF_SIZE \
+      (roundup((roundup(1280, 32) * roundup(720, 32) * 4), 4096) * 3)
+      
+#else
+#define MSM_FB_PRIM_BUF_SIZE \
+      (roundup((roundup(1280, 32) * roundup(720, 32) * 4), 4096) * 2)
+      
+#endif
+#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE, 4096)
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
+#define MSM_FB_OVERLAY0_WRITEBACK_SIZE \
+      roundup((roundup(1280, 32) * roundup(720, 32) * 3 * 2), 4096)
+#else
+#define MSM_FB_OVERLAY0_WRITEBACK_SIZE (0)
+#endif  
+#ifdef CONFIG_FB_MSM_OVERLAY1_WRITEBACK
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE \
+      roundup((roundup(1920, 32) * roundup(1080, 32) * 3 * 2), 4096)
+#else
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE (0)
+#endif  
+#define MDP_VSYNC_GPIO 0
+#define MIPI_CMD_NOVATEK_QHD_PANEL_NAME        "mipi_cmd_novatek_qhd"
+#define MIPI_VIDEO_NOVATEK_QHD_PANEL_NAME      "mipi_video_novatek_qhd"
+#define MIPI_VIDEO_TOSHIBA_WSVGA_PANEL_NAME    "mipi_video_toshiba_wsvga"
+#define MIPI_VIDEO_TOSHIBA_WUXGA_PANEL_NAME    "mipi_video_toshiba_wuxga"
+#define MIPI_VIDEO_CHIMEI_WXGA_PANEL_NAME      "mipi_video_chimei_wxga"
+#define MIPI_VIDEO_CHIMEI_WUXGA_PANEL_NAME     "mipi_video_chimei_wuxga"
+#define MIPI_VIDEO_SIMULATOR_VGA_PANEL_NAME    "mipi_video_simulator_vga"
+#define MIPI_CMD_RENESAS_FWVGA_PANEL_NAME      "mipi_cmd_renesas_fwvga"
+#define MIPI_VIDEO_ORISE_720P_PANEL_NAME       "mipi_video_orise_720p"
+#define MIPI_CMD_ORISE_720P_PANEL_NAME       "mipi_cmd_orise_720p"
+#define HDMI_PANEL_NAME        "hdmi_msm"
+#define TVOUT_PANEL_NAME       "tvout_msm"
+
 #ifdef CONFIG_RAWCHIP
 static struct spi_board_info rawchip_spi_board_info[] __initdata = {
 	{
@@ -802,269 +839,19 @@ static struct spi_board_info rawchip_spi_board_info[] __initdata = {
 };
 #endif
 
-
-#if 0
-static bool dsi_power_on;
-
-static int mipi_dsi_liquid_panel_power(int on)
-{
-	static struct regulator *reg_l2, *reg_ext_3p3v;
-	static int gpio21, gpio24, gpio43;
-	int rc;
-
-	pr_info("%s: on=%d\n", __func__, on);
-
-	gpio21 = PM8921_GPIO_PM_TO_SYS(21); 
-	gpio43 = PM8921_GPIO_PM_TO_SYS(43); 
-	gpio24 = PM8921_GPIO_PM_TO_SYS(24); 
-
-	if (!dsi_power_on) {
-
-		reg_l2 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vdda");
-		if (IS_ERR(reg_l2)) {
-			pr_err("could not get 8921_l2, rc = %ld\n",
-				PTR_ERR(reg_l2));
-			return -ENODEV;
-		}
-
-		rc = regulator_set_voltage(reg_l2, 1200000, 1200000);
-		if (rc) {
-			pr_err("set_voltage l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-
-		reg_ext_3p3v = regulator_get(&msm_mipi_dsi1_device.dev,
-			"vdd_lvds_3p3v");
-		if (IS_ERR(reg_ext_3p3v)) {
-			pr_err("could not get reg_ext_3p3v, rc = %ld\n",
-			       PTR_ERR(reg_ext_3p3v));
-		    return -ENODEV;
-		}
-
-		rc = gpio_request(gpio21, "disp_pwr_en_n");
-		if (rc) {
-			pr_err("request gpio 21 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		rc = gpio_request(gpio43, "disp_rst_n");
-		if (rc) {
-			pr_err("request gpio 43 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		rc = gpio_request(gpio24, "disp_backlight_pwm");
-		if (rc) {
-			pr_err("request gpio 24 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		dsi_power_on = true;
-	}
-
-	if (on) {
-		rc = regulator_set_optimum_mode(reg_l2, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_enable(reg_l2);
-		if (rc) {
-			pr_err("enable l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		rc = regulator_enable(reg_ext_3p3v);
-		if (rc) {
-			pr_err("enable reg_ext_3p3v failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-
-		
-		gpio_set_value_cansleep(gpio43, 0); 
-
-		gpio_set_value_cansleep(gpio21, 0); 
-		msleep(20);
-		gpio_set_value_cansleep(gpio43, 1); 
-		msleep(20);
-		gpio_set_value_cansleep(gpio43, 0); 
-		msleep(20);
-		gpio_set_value_cansleep(gpio43, 1); 
-		msleep(20);
-	} else {
-		gpio_set_value_cansleep(gpio43, 0);
-		gpio_set_value_cansleep(gpio21, 1);
-
-		rc = regulator_disable(reg_l2);
-		if (rc) {
-			pr_err("disable reg_l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_disable(reg_ext_3p3v);
-		if (rc) {
-			pr_err("disable reg_ext_3p3v failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_set_optimum_mode(reg_l2, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
-static int mipi_dsi_cdp_panel_power(int on)
-{
-	static struct regulator *reg_l8, *reg_l23, *reg_l2;
-	static int gpio43;
-	int rc;
-
-	pr_info("%s: state : %d\n", __func__, on);
-
-	if (!dsi_power_on) {
-
-		reg_l8 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vdc");
-		if (IS_ERR(reg_l8)) {
-			pr_err("could not get 8921_l8, rc = %ld\n",
-				PTR_ERR(reg_l8));
-			return -ENODEV;
-		}
-		reg_l23 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vddio");
-		if (IS_ERR(reg_l23)) {
-			pr_err("could not get 8921_l23, rc = %ld\n",
-				PTR_ERR(reg_l23));
-			return -ENODEV;
-		}
-		reg_l2 = regulator_get(&msm_mipi_dsi1_device.dev,
-				"dsi_vdda");
-		if (IS_ERR(reg_l2)) {
-			pr_err("could not get 8921_l2, rc = %ld\n",
-				PTR_ERR(reg_l2));
-			return -ENODEV;
-		}
-		rc = regulator_set_voltage(reg_l8, 2800000, 3000000);
-		if (rc) {
-			pr_err("set_voltage l8 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_voltage(reg_l23, 1800000, 1800000);
-		if (rc) {
-			pr_err("set_voltage l23 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_voltage(reg_l2, 1200000, 1200000);
-		if (rc) {
-			pr_err("set_voltage l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		gpio43 = PM8921_GPIO_PM_TO_SYS(43);
-		rc = gpio_request(gpio43, "disp_rst_n");
-		if (rc) {
-			pr_err("request gpio 43 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		dsi_power_on = true;
-	}
-	if (on) {
-		rc = regulator_set_optimum_mode(reg_l8, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l8 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l23, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l2, 100000);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_enable(reg_l8);
-		if (rc) {
-			pr_err("enable l8 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_enable(reg_l23);
-		if (rc) {
-			pr_err("enable l8 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_enable(reg_l2);
-		if (rc) {
-			pr_err("enable l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		gpio_set_value_cansleep(gpio43, 1);
-	} else {
-		rc = regulator_disable(reg_l2);
-		if (rc) {
-			pr_err("disable reg_l2 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_disable(reg_l8);
-		if (rc) {
-			pr_err("disable reg_l8 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_disable(reg_l23);
-		if (rc) {
-			pr_err("disable reg_l23 failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = regulator_set_optimum_mode(reg_l8, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l8 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l23, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l23 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		rc = regulator_set_optimum_mode(reg_l2, 100);
-		if (rc < 0) {
-			pr_err("set_optimum_mode l2 failed, rc=%d\n", rc);
-			return -EINVAL;
-		}
-		gpio_set_value_cansleep(gpio43, 0);
-	}
-	return 0;
-}
-
-static int mipi_dsi_panel_power(int on)
-{
-	int ret;
-
-	pr_info("%s: on=%d\n", __func__, on);
-
-	if (machine_is_msm8960_liquid())
-		ret = mipi_dsi_liquid_panel_power(on);
-	else
-		ret = mipi_dsi_cdp_panel_power(on);
-
-	return ret;
-}
-
-static struct mipi_dsi_platform_data mipi_dsi_pdata = {
-	.vsync_gpio = MDP_VSYNC_GPIO,
-	.dsi_power_save = mipi_dsi_panel_power,
-};
-#endif
-
 #ifdef CONFIG_HTC_BATT_8960
+#ifdef CONFIG_HTC_PNPMGR
+extern int pnpmgr_battery_charging_enabled(int charging_enabled);
+#endif 
+static int critical_alarm_voltage_mv[] = {3000, 3200, 3400};
+
 static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.guage_driver = 0,
 	.chg_limit_active_mask = HTC_BATT_CHG_LIMIT_BIT_TALK |
 								HTC_BATT_CHG_LIMIT_BIT_NAVI,
 	.critical_low_voltage_mv = 3100,
-	.critical_alarm_voltage_mv = 3000,
+	.critical_alarm_vol_ptr = critical_alarm_voltage_mv,
+	.critical_alarm_vol_cols = sizeof(critical_alarm_voltage_mv) / sizeof(int),
 	.overload_vol_thr_mv = 4000,
 	.overload_curr_thr_ma = 0,
 	
@@ -1083,6 +870,9 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 						cable_detect_register_notifier,
 	.icharger.dump_all = pm8921_dump_all,
 	.icharger.get_attr_text = pm8921_charger_get_attr_text,
+	.icharger.max_input_current =pm8921_set_hsml_target_ma,
+	.icharger.is_safty_timer_timeout = pm8921_is_chg_safety_timer_timeout,
+	.icharger.is_battery_full_eoc_stop = pm8921_is_batt_full_eoc_stop,
 	
 	.igauge.name = "pm8921",
 	.igauge.get_battery_voltage = pm8921_get_batt_voltage,
@@ -1099,6 +889,10 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.igauge.enable_lower_voltage_alarm = pm8xxx_batt_lower_alarm_enable,
 	.igauge.set_lower_voltage_alarm_threshold =
 						pm8xxx_batt_lower_alarm_threshold_set,
+	
+#ifdef CONFIG_HTC_PNPMGR
+	.notify_pnpmgr_charging_enabled = pnpmgr_battery_charging_enabled,
+#endif 
 };
 
 static struct platform_device htc_battery_pdev = {
@@ -1992,6 +1786,134 @@ static struct attribute_group properties_attr_3_keys_group = {
 };
 
 
+#ifdef CONFIG_MSM_BUS_SCALING
+static struct msm_bus_vectors mdp_init_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 0,
+		.ib = 0,
+	},
+};
+
+static struct msm_bus_vectors mdp_ui_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 216000000 * 2,
+		.ib = 270000000 * 2,
+	},
+};
+
+static struct msm_bus_vectors mdp_vga_vectors[] = {
+	
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 216000000 * 2,
+		.ib = 270000000 * 2,
+	},
+};
+
+static struct msm_bus_vectors mdp_720p_vectors[] = {
+	
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 230400000 * 2,
+		.ib = 288000000 * 2,
+	},
+};
+
+static struct msm_bus_vectors mdp_1080p_vectors[] = {
+	
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 334080000 * 2,
+		.ib = 417600000 * 2,
+	},
+};
+
+static struct msm_bus_vectors mdp_composition_1_vectors[] = {
+	
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 1280 * 736 * 4 * 60 * 2,
+		.ib = 1280 * 736 * 4 * 60 * 2 * 1.5,
+	},
+};
+
+static struct msm_bus_vectors mdp_composition_2_vectors[] = {
+	
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 1280 * 736 * 4 * 60 * 3,
+		.ib = 1280 * 736 * 4 * 60 * 3 * 1.5,
+	},
+};
+
+
+static struct msm_bus_vectors mdp_composition_3_vectors[] = {
+	
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 1280 * 736 * 4 * 60 * 4,
+		.ib = 1280 * 736 * 4 * 60 * 4 * 1.5,
+	},
+};
+
+static struct msm_bus_paths mdp_bus_scale_usecases[] = {
+	{
+		ARRAY_SIZE(mdp_init_vectors),
+		mdp_init_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_ui_vectors),
+		mdp_ui_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_ui_vectors),
+		mdp_ui_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_vga_vectors),
+		mdp_vga_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_720p_vectors),
+		mdp_720p_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_1080p_vectors),
+		mdp_1080p_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_composition_1_vectors),
+		mdp_composition_1_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_composition_2_vectors),
+		mdp_composition_2_vectors,
+	},
+	{
+		ARRAY_SIZE(mdp_composition_3_vectors),
+		mdp_composition_3_vectors,
+	},
+};
+
+static struct msm_bus_scale_pdata mdp_bus_scale_pdata = {
+	mdp_bus_scale_usecases,
+	ARRAY_SIZE(mdp_bus_scale_usecases),
+	.name = "mdp",
+};
+
+#endif
+
+
 struct mdp_reg jet_sony_nt_gamma[] = {
 	{0x94800, 0x000000, 0x0},
 	{0x94804, 0x020202, 0x0},
@@ -2512,64 +2434,49 @@ struct mdp_reg jet_sony_nt_gamma[] = {
 #endif
 };
 
-#if 0
-#define LPM_CHANNEL0 0
-static int toshiba_gpio[] = {LPM_CHANNEL0};
 
-static struct mipi_dsi_panel_platform_data toshiba_pdata = {
-	.gpio = toshiba_gpio,
-};
-
-static struct platform_device mipi_dsi_toshiba_panel_device = {
-	.name = "mipi_toshiba",
-	.id = 0,
-	.dev = {
-		.platform_data = &toshiba_pdata,
-	}
-};
-
-static int dsi2lvds_gpio[2] = {
-	0,
-	0x1F08 
-	};
-
-static struct msm_panel_common_pdata mipi_dsi2lvds_pdata = {
-	.gpio_num = dsi2lvds_gpio,
-};
-
-static struct mipi_dsi_phy_ctrl dsi_novatek_cmd_mode_phy_db = {
-
-	{0x0F, 0x0a, 0x04, 0x00, 0x20},	
+int jet_mdp_gamma(void)
+{
+	#if 0
 	
-	{0xab, 0x8a, 0x18, 0x00, 0x92, 0x97, 0x1b, 0x8c,
-	0x0c, 0x03, 0x04, 0xa0},
-	{0x5f, 0x00, 0x00, 0x10},	
-	{0xff, 0x00, 0x06, 0x00},	
-	
-	{0x40, 0xf9, 0x30, 0xda, 0x00, 0x40, 0x03, 0x62,
-	0x40, 0x07, 0x03,
-	0x00, 0x1a, 0x00, 0x00, 0x02, 0x00, 0x20, 0x00, 0x01},
-};
-
-static struct mipi_dsi_panel_platform_data novatek_pdata = {
-	.phy_ctrl_settings = &dsi_novatek_cmd_mode_phy_db,
-};
-
-static struct platform_device mipi_dsi_novatek_panel_device = {
-	.name = "mipi_novatek",
-	.id = 0,
-	.dev = {
-		.platform_data = &novatek_pdata,
+	if (panel_type == PANEL_ID_JET_SONY_NT
+			|| panel_type == PANEL_ID_JET_SONY_NT_C1
+			|| panel_type == PANEL_ID_JET_SONY_NT_C2) {
+		
+		mdp_color_enhancement(jet_sony_nt_gamma, ARRAY_SIZE(jet_sony_nt_gamma));
 	}
-};
+	#endif
+	return 0;
+}
 
-static struct platform_device mipi_dsi2lvds_bridge_device = {
-	.name = "mipi_tc358764",
-	.id = 0,
-	.dev.platform_data = &mipi_dsi2lvds_pdata,
-};
+static struct msm_panel_common_pdata mdp_pdata = {
+	.gpio = MDP_VSYNC_GPIO,
+#ifdef CONFIG_MSM_BUS_SCALING
+	.mdp_bus_scale_table = &mdp_bus_scale_pdata,
 #endif
+	.mdp_rev = MDP_REV_42,
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	.mem_hid = BIT(ION_CP_MM_HEAP_ID),
+#else
+	.mem_hid = MEMTYPE_EBI1,
+#endif
+	
 
+	.mdp_gamma = jet_mdp_gamma,
+	.mdp_max_clk = 200000000,
+};
+
+void __init msm8960_mdp_writeback(struct memtype_reserve* reserve_table)
+{
+	mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
+	mdp_pdata.ov1_wb_size = MSM_FB_OVERLAY1_WRITEBACK_SIZE;
+#if defined(CONFIG_ANDROID_PMEM) && !defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
+	reserve_table[mdp_pdata.mem_hid].size +=
+		mdp_pdata.ov0_wb_size;
+	reserve_table[mdp_pdata.mem_hid].size +=
+		mdp_pdata.ov1_wb_size;
+#endif
+}
 
 static uint32_t headset_cpu_gpio[] = {
 	GPIO_CFG(JET_GPIO_AUD_1WIRE_DO, 1, GPIO_CFG_OUTPUT,
@@ -2747,11 +2654,11 @@ static struct headset_adc_config htc_headset_mgr_config[] = {
 	{
 		.type = HEADSET_MIC,
 		.adc_max = 1530,
-		.adc_min = 1223,
+		.adc_min = 1244,
 	},
 	{
 		.type = HEADSET_BEATS,
-		.adc_max = 1222,
+		.adc_max = 1243,
 		.adc_min = 916,
 	},
 	{
@@ -2851,6 +2758,44 @@ static struct platform_device hdmi_msm_device = {
 	.dev.platform_data = &hdmi_msm_data,
 };
 #endif 
+
+#ifdef CONFIG_MSM_BUS_SCALING
+static struct msm_bus_vectors dtv_bus_init_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 0,
+		.ib = 0,
+	},
+};
+static struct msm_bus_vectors dtv_bus_def_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_MDP_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 566092800 * 2,
+		.ib = 707616000 * 2,
+	},
+};
+static struct msm_bus_paths dtv_bus_scale_usecases[] = {
+	{
+		ARRAY_SIZE(dtv_bus_init_vectors),
+		dtv_bus_init_vectors,
+	},
+	{
+		ARRAY_SIZE(dtv_bus_def_vectors),
+		dtv_bus_def_vectors,
+	},
+};
+static struct msm_bus_scale_pdata dtv_bus_scale_pdata = {
+	dtv_bus_scale_usecases,
+	ARRAY_SIZE(dtv_bus_scale_usecases),
+	.name = "dtv",
+};
+
+static struct lcdc_platform_data dtv_pdata = {
+	.bus_scale_table = &dtv_bus_scale_pdata,
+};
+#endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static int hdmi_enable_5v(int on)
@@ -4046,8 +3991,9 @@ static struct android_usb_platform_data android_usb_pdata = {
 	.functions = usb_functions_all,
 	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
 	.usb_id_pin_gpio = JET_GPIO_USB_ID1,
-	.usb_rmnet_interface = "smd,bam",
-	.fserial_init_string = "smd:modem,tty,tty:autobot,tty:serial,tty:autobot",
+	.usb_diag_interface = "diag",
+	.usb_rmnet_interface = "smd:bam",
+	.fserial_init_string = "smd:modem,tty,tty:autobot,tty:serial,tty:autobot,tty:acm",
 	.nluns		= 1,
 };
 
@@ -4163,39 +4109,6 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.modes = msm_spm_seq_list,
 	},
 };
-
-#ifdef CONFIG_PERFLOCK
-static unsigned jet_perf_acpu_table[] = {
-	594000000, 
-	810000000, 
-	1026000000, 
-	1134000000,
-	1512000000, 
-};
-
-static struct perflock_data jet_perflock_data = {
-	.perf_acpu_table = jet_perf_acpu_table,
-	.table_size = ARRAY_SIZE(jet_perf_acpu_table),
-};
-
-static struct perflock_data jet_cpufreq_ceiling_data = {
-	.perf_acpu_table = jet_perf_acpu_table,
-	.table_size = ARRAY_SIZE(jet_perf_acpu_table),
-};
-
-static struct perflock_pdata perflock_pdata = {
-       .perf_floor = &jet_perflock_data,
-       .perf_ceiling = &jet_cpufreq_ceiling_data,
-};
-
-struct platform_device msm8960_device_perf_lock = {
-       .name = "perf_lock",
-       .id = -1,
-       .dev = {
-               .platform_data = &perflock_pdata,
-       },
-};
-#endif
 
 static uint8_t l2_spm_wfi_cmd_sequence[] __initdata = {
 			0x00, 0x20, 0x03, 0x20,
@@ -4442,7 +4355,6 @@ static uint32_t gsbi12_gpio_table_gpio[] = {
 static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 {
 	printk(KERN_INFO "%s(): adap_id = %d, config_type = %d \n", __func__, adap_id, config_type);
-
 	if ((adap_id == MSM_8960_GSBI3_QUP_I2C_BUS_ID) && (config_type == 1)) {
 		gpio_tlmm_config(gsbi3_gpio_table[0], GPIO_CFG_ENABLE);
 		gpio_tlmm_config(gsbi3_gpio_table[1], GPIO_CFG_ENABLE);
@@ -4694,7 +4606,7 @@ static struct platform_device vibrator_pwm_device = {
 	},
 };
 static struct platform_device *vibrator_pwm_devices[] __initdata = {
-	&vibrator_pwm_device,
+        &vibrator_pwm_device,
 };
 
 static struct platform_device *common_devices[] __initdata = {
@@ -4810,11 +4722,6 @@ static struct platform_device *jet_devices[] __initdata = {
 	&msm_cpudai_auxpcm_tx,
 	&msm_cpu_fe,
 	&msm_stub_codec,
-	&msm_kgsl_3d0,
-#ifdef CONFIG_MSM_KGSL_2D
-	&msm_kgsl_2d0,
-	&msm_kgsl_2d1,
-#endif
 #ifdef CONFIG_MSM_GEMINI
 	&msm8960_gemini_device,
 #endif
@@ -4866,13 +4773,33 @@ static void __init msm8960_i2c_init(void)
 
 static void __init msm8960_gfx_init(void)
 {
+	struct kgsl_device_platform_data *kgsl_3d0_pdata =
+		msm_kgsl_3d0.dev.platform_data;
 	uint32_t soc_platform_version = socinfo_get_version();
-	if (SOCINFO_VERSION_MAJOR(soc_platform_version) == 1) {
-		struct kgsl_device_platform_data *kgsl_3d0_pdata =
-				msm_kgsl_3d0.dev.platform_data;
-		kgsl_3d0_pdata->pwrlevel[0].gpu_freq = 320000000;
-		kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 266667000;
-		kgsl_3d0_pdata->nap_allowed = false;
+
+	
+	if (cpu_is_msm8960ab()) {
+		kgsl_3d0_pdata->chipid = ADRENO_CHIPID(3, 2, 1, 0);
+		
+		kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 320000000;
+	} else {
+		kgsl_3d0_pdata->iommu_count = 1;
+		if (SOCINFO_VERSION_MAJOR(soc_platform_version) == 1) {
+			kgsl_3d0_pdata->pwrlevel[0].gpu_freq = 320000000;
+			kgsl_3d0_pdata->pwrlevel[1].gpu_freq = 266667000;
+		}
+		if (SOCINFO_VERSION_MAJOR(soc_platform_version) >= 3) {
+			kgsl_3d0_pdata->chipid = ADRENO_CHIPID(2, 2, 0, 6);
+		}
+	}
+
+	
+	platform_device_register(&msm_kgsl_3d0);
+
+	
+	if (!cpu_is_msm8960ab()) {
+		platform_device_register(&msm_kgsl_2d0);
+		platform_device_register(&msm_kgsl_2d1);
 	}
 }
 
@@ -5124,7 +5051,11 @@ static struct pm8xxx_mpp_platform_data pm8xxx_mpp_pdata __devinitdata = {
 
 static struct pm8xxx_rtc_platform_data pm8xxx_rtc_pdata __devinitdata = {
 	.rtc_write_enable       = true,
-	.rtc_alarm_powerup	= false,
+#ifdef CONFIG_HTC_OFFMODE_ALARM
+	.rtc_alarm_powerup      = true,
+#else
+	.rtc_alarm_powerup      = false,
+#endif
 };
 
 static struct pm8xxx_pwrkey_platform_data pm8xxx_pwrkey_pdata = {
@@ -5156,6 +5087,7 @@ static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
 	.cool_bat_voltage	= 4200,
 	.warm_bat_voltage	= 4000,
 	.mbat_in_gpio		= JET_GPIO_MBAT_IN,
+	.is_embeded_batt	= 1,
 	.thermal_mitigation	= pm8921_therm_mitigation,
 	.thermal_levels		= ARRAY_SIZE(pm8921_therm_mitigation),
 	.cold_thr = PM_SMBC_BATT_TEMP_COLD_THR__HIGH,
@@ -5176,6 +5108,11 @@ static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
 
 static int __init check_dq_setup(char *str)
 {
+	int i = 0;
+	int size = 0;
+
+	size = sizeof(chg_batt_params)/sizeof(chg_batt_params[0]);
+
 	if (!strcmp(str, "PASS")) {
 		pr_info("[BATT] overwrite HV battery config\n");
 		pm8921_chg_pdata.max_voltage = 4340;
@@ -5186,6 +5123,12 @@ static int __init check_dq_setup(char *str)
 		pm8921_chg_pdata.max_voltage = 4200;
 		pm8921_chg_pdata.cool_bat_voltage = 4200;
 		pm8921_bms_pdata.max_voltage_uv = 4200 * 1000;
+
+		for(i=0; i < size; i++)
+		{
+			chg_batt_params[i].max_voltage = 4200;
+			chg_batt_params[i].cool_bat_voltage = 4200;
+		}
 	}
 	return 1;
 }
@@ -5318,62 +5261,56 @@ static struct msm_rpmrs_level msm_rpmrs_levels[] = {
 		MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
-		100, 8000, 100000, 1,
+		1, 784, 180000, 100,
 	},
 #if 0
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
-		2000, 6000, 60100000, 3000,
+		1300, 228, 1200000, 2000,
 	},
 #endif
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, GDHS, MAX, ACTIVE),
 		false,
-		4600, 5000, 60350000, 3500,
+		2000, 138, 1208400, 3200,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
-		MSM_RPMRS_LIMITS(ON, HSFS_OPEN, MAX, ACTIVE),
-		false,
-		6700, 4500, 65350000, 4800,
-	},
-	{
-		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, HSFS_OPEN, ACTIVE, RET_HIGH),
 		false,
-		7400, 3500, 66600000, 5150,
+		6000, 119, 1850300, 9000,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, GDHS, MAX, ACTIVE),
 		false,
-		12100, 2500, 67850000, 5500,
+		9200, 68, 2839200, 16400,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, MAX, ACTIVE),
 		false,
-		14200, 2000, 71850000, 6800,
+		10300, 63, 3128000, 18200,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, ACTIVE, RET_HIGH),
 		false,
-		30100, 500, 75850000, 8800,
+		18000, 10, 4602600, 27000,
 	},
 
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(OFF, HSFS_OPEN, RET_HIGH, RET_LOW),
 		false,
-		30100, 0, 76350000, 9800,
+		20000, 2, 5752000, 32000,
 	},
 };
 
@@ -5465,7 +5402,7 @@ static struct cm3629_platform_data cm36282_pdata = {
 	.ps_conf2_val = CM3629_PS_ITB_1 | CM3629_PS_ITR_1 |
 		CM3629_PS2_INT_DIS | CM3629_PS1_INT_DIS,
 	.ps_conf3_val = CM3629_PS2_PROL_32,
-	.enable_polling_ignore = 1,
+	.dynamical_threshold = 1,
 	.mapping_table = cm3629_mapping_table,
 	.mapping_size = ARRAY_SIZE(cm3629_mapping_table),
 };
@@ -5584,6 +5521,52 @@ static void msm_uart_gsbi_gpio_init(void)
 	gpio_tlmm_config(msm_uart_gpio[1], GPIO_CFG_ENABLE);
 }
 
+static struct resource msm_fb_resources[] = {
+	{
+		.flags = IORESOURCE_DMA,
+	}
+};
+static int jet_detect_panel(const char *name)
+{
+	if (!strncmp(name, HDMI_PANEL_NAME,
+		strnlen(HDMI_PANEL_NAME,
+			PANEL_NAME_MAX_LEN)))
+		return 0;
+
+	return -ENODEV;
+}
+
+static struct msm_fb_platform_data msm_fb_pdata = {
+	.detect_client = jet_detect_panel,
+};
+
+static struct platform_device msm_fb_device = {
+	.name   = "msm_fb",
+	.id     = 0,
+	.num_resources     = ARRAY_SIZE(msm_fb_resources),
+	.resource          = msm_fb_resources,
+	.dev.platform_data = &msm_fb_pdata,
+};
+
+void __init msm8960_init_fb(void)
+{
+	platform_device_register(&msm_fb_device);
+#ifdef CONFIG_FB_MSM_WRITEBACK_MSM_PANEL
+	platform_device_register(&wfd_panel_device);
+	platform_device_register(&wfd_device);
+#endif
+
+	if (machine_is_msm8x60_rumi3()) {
+		msm_fb_register_device("mdp", NULL);
+		
+	} else
+		msm_fb_register_device("mdp", &mdp_pdata);
+
+#ifdef CONFIG_MSM_BUS_SCALING
+	msm_fb_register_device("dtv", &dtv_pdata);
+#endif
+}
+
 static void __init jet_init(void)
 {
 	int rc = 0, i=0;
@@ -5607,6 +5590,7 @@ static void __init jet_init(void)
 	msm_clock_init(&msm8960_clock_init_data);
 
 	android_usb_pdata.swfi_latency = msm_rpm_get_swfi_latency();
+
 	msm8960_device_otg.dev.platform_data = &msm_otg_pdata;
 	jet_gpiomux_init();
 	msm8960_device_qup_spi_gsbi10.dev.platform_data =
@@ -5727,6 +5711,19 @@ static void __init jet_init(void)
 
 #define PHY_BASE_ADDR2  0x90000000
 #define SIZE_ADDR2      (768 * 1024 * 1024)
+
+void __init jet_allocate_fb_regions(void)
+{
+	void *addr;
+	unsigned long size;
+
+	size = MSM_FB_SIZE;
+	addr = alloc_bootmem_align(size, 0x1000);
+	msm_fb_resources[0].start = __pa(addr);
+	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
+	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
+		 size, addr, __pa(addr));
+}
 
 static void __init jet_fixup(struct tag *tags,
 				 char **cmdline, struct meminfo *mi)

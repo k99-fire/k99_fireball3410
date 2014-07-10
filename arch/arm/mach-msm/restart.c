@@ -339,12 +339,12 @@ void msm_restart(char mode, const char *cmd)
 		set_restart_action(RESTART_REASON_BOOTLOADER, NULL);
 	} else if (!strncmp(cmd, "recovery", 8)) {
 		set_restart_action(RESTART_REASON_RECOVERY, NULL);
-    } else if (!strcmp(cmd, "eraseflash")) {
+	} else if (!strncmp(cmd, "eraseflash", 10)) {
         set_restart_action(RESTART_REASON_ERASE_FLASH, NULL);
 	} else if (!strncmp(cmd, "oem-", 4)) {
 		oem_code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
 		set_restart_to_oem(oem_code, NULL);
-	} else if (!strcmp(cmd, "force-hard") ||
+	} else if (!strncmp(cmd, "force-hard", 10) ||
 			(RESTART_MODE_LEGECY < mode && mode < RESTART_MODE_MAX)
 			) {
 		

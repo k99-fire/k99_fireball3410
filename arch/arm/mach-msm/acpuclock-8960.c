@@ -2071,6 +2071,10 @@ static void __init select_freq_plan(void)
 		acpu_freq_tbl = acpu_freq_tbl_8930_pvs[pvs_id];
 		l2_freq_tbl = l2_freq_tbl_8930;
 		l2_freq_tbl_size = ARRAY_SIZE(l2_freq_tbl_8930);
+                if (pvs_id != PVS_SLOW) {
+                        enable_boost = true;
+                        boost_uv = 25000;
+                }
 	} else if (cpu_is_msm8930aa()) {
 		enum pvs pvs_id = get_pvs();
 
@@ -2078,6 +2082,10 @@ static void __init select_freq_plan(void)
 		acpu_freq_tbl = acpu_freq_tbl_8930aa_pvs[pvs_id];
 		l2_freq_tbl = l2_freq_tbl_8930;
 		l2_freq_tbl_size = ARRAY_SIZE(l2_freq_tbl_8930);
+		if (pvs_id != PVS_SLOW) {
+			enable_boost = true;
+			boost_uv = 25000;
+		}
 	} else {
 		BUG();
 	}

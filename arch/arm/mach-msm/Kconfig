@@ -239,6 +239,122 @@ config ARCH_APQ8064_M7
 	select MSM_CPU_PWRCTL
 	select MSM_IOMMU_GPU_SYNC
 
+config ARCH_APQ8064_M7DXG
+	bool "APQ8064_M7DXG"
+	select ARCH_MSM_KRAITMP
+	select GPIO_MSM_V2
+	select ARM_GIC
+	select CPU_V7
+	select MSM_SCM if SMP
+	select MSM_GPIOMUX
+	select MSM_REMOTE_SPINLOCK_SFPB
+	select MSM_PIL
+	select MSM_QDSP6_APR
+	select MSM_QDSP6_CODECS
+	select MSM_AUDIO_QDSP6 if SND_SOC
+	select MULTI_IRQ_HANDLER
+	select MSM_RPM
+	select MSM_SPM_V2
+	select MSM_L2_SPM
+	select MSM_PM8X60 if PM
+	select CPU_HAS_L2_PMU
+	select HOLES_IN_ZONE if SPARSEMEM
+	select CLEANCACHE
+	select QCACHE
+	select MIGHT_HAVE_PCI
+	select ARCH_SUPPORTS_MSI
+	select ARM_HAS_SG_CHAIN
+	select MSM_KRAIT_WFE_FIXUP
+	select MSM_CPU_PWRCTL
+	select MSM_IOMMU_GPU_SYNC
+
+config ARCH_APQ8064_T6DXG
+	bool "APQ8064_T6DXG"
+	select ARCH_MSM_KRAITMP
+	select GPIO_MSM_V2
+	select ARM_GIC
+	select CPU_V7
+	select MSM_SCM if SMP
+	select MSM_GPIOMUX
+	select MSM_REMOTE_SPINLOCK_SFPB
+	select MSM_PIL
+	select MSM_QDSP6_APR
+	select MSM_QDSP6_CODECS
+	select MSM_AUDIO_QDSP6 if SND_SOC
+	select MULTI_IRQ_HANDLER
+	select MSM_RPM
+	select MSM_SPM_V2
+	select MSM_L2_SPM
+	select MSM_PM8X60 if PM
+	select CPU_HAS_L2_PMU
+	select HOLES_IN_ZONE if SPARSEMEM
+	select CLEANCACHE
+	select QCACHE
+	select MIGHT_HAVE_PCI
+	select ARCH_SUPPORTS_MSI
+	select ARM_HAS_SG_CHAIN
+	select MSM_KRAIT_WFE_FIXUP
+	select MSM_CPU_PWRCTL
+	select MSM_IOMMU_GPU_SYNC
+
+config ARCH_APQ8064_DLXP
+	bool "APQ8064_DLXP"
+	select ARCH_MSM_KRAITMP
+	select GPIO_MSM_V2
+	select ARM_GIC
+	select CPU_V7
+	select MSM_SCM if SMP
+	select MSM_GPIOMUX
+	select MSM_REMOTE_SPINLOCK_SFPB
+	select MSM_PIL
+	select MSM_QDSP6_APR
+	select MSM_QDSP6_CODECS
+	select MSM_AUDIO_QDSP6 if SND_SOC
+	select MULTI_IRQ_HANDLER
+	select MSM_RPM
+	select MSM_SPM_V2
+	select MSM_L2_SPM
+	select MSM_PM8X60 if PM
+	select CPU_HAS_L2_PMU
+	select HOLES_IN_ZONE if SPARSEMEM
+	select CLEANCACHE
+	select QCACHE
+	select MIGHT_HAVE_PCI
+	select ARCH_SUPPORTS_MSI
+	select ARM_HAS_SG_CHAIN
+	select MSM_KRAIT_WFE_FIXUP
+	select MSM_IOMMU_GPU_SYNC
+	select MSM_CPU_PWRCTL
+
+config ARCH_APQ8064_DLPDXG
+	bool "APQ8064_DLPDXG"
+	select ARCH_MSM_KRAITMP
+	select GPIO_MSM_V2
+	select ARM_GIC
+	select CPU_V7
+	select MSM_SCM if SMP
+	select MSM_GPIOMUX
+	select MSM_REMOTE_SPINLOCK_SFPB
+	select MSM_PIL
+	select MSM_QDSP6_APR
+	select MSM_QDSP6_CODECS
+	select MSM_AUDIO_QDSP6 if SND_SOC
+	select MULTI_IRQ_HANDLER
+	select MSM_RPM
+	select MSM_SPM_V2
+	select MSM_L2_SPM
+	select MSM_PM8X60 if PM
+	select CPU_HAS_L2_PMU
+	select HOLES_IN_ZONE if SPARSEMEM
+	select CLEANCACHE
+	select QCACHE
+	select MIGHT_HAVE_PCI
+	select ARCH_SUPPORTS_MSI
+	select ARM_HAS_SG_CHAIN
+	select MSM_KRAIT_WFE_FIXUP
+	select MSM_IOMMU_GPU_SYNC
+	select MSM_CPU_PWRCTL
+
 config ARCH_MSM8974
 	bool "MSM8974"
 	select ARCH_MSM_KRAITMP
@@ -323,11 +439,41 @@ config MACH_K2_U
 	help
 	  Support for the HTC K2_U
 
+config MACH_TC2
+	depends on ARCH_MSM8930
+	bool "TC2"
+	help
+	  Support for the HTC TC2
+
 config MACH_K2_UL
 	depends on ARCH_MSM8930
 	bool "K2_UL"
 	help
 	  Support for the HTC K2_UL
+
+config MACH_M4_UL
+	depends on ARCH_MSM8930
+	bool "M4_UL"
+	help
+	  Support for the HTC M4_UL
+
+config MACH_M4_U
+	depends on ARCH_MSM8930
+	bool "M4_U"
+	help
+	  Support for the HTC M4
+
+config MACH_ZIP_CL
+	depends on ARCH_MSM8930
+	bool "ZIP_CL"
+	help
+	  Support for the HTC ZIP_CL
+
+config MACH_ZIP_CL_MI2S_DATA_SWITCH
+	depends on MACH_ZIP_CL
+	bool "ZIP_CL_MI2S_DATA_SWITCH"
+	help
+	  Support for the workaround for ZIP_CL MI2S data Input/Output switch
 
 config MACH_EVITA_UTL
         depends on ARCH_MSM8960
@@ -506,6 +652,10 @@ config PERFLOCK
         depends on ARCH_APQ8064 || ARCH_MSM8960 || ARCH_MSM8X60 || ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
         default n
         bool "HTC Performance Lock"
+
+config DEBUG_KSWAPD
+        default n
+        bool "HTC Debug Kswapd busy"
 
 config PERFLOCK_FIX_UP
         depends on CPU_FREQ
@@ -1152,6 +1302,18 @@ config HTC_ONMODE_CHARGING
 	help
 		support on mode charing icon
 
+config DUTY_CYCLE_LIMIT
+	bool "Duty cycle limit charging support"
+	default n
+	help
+		support on duty cycle limit charging
+
+config BUILD_EDIAG
+        bool "Build in embedded diag fixes"
+        default n
+        help
+          For embedded diag we need to do some additional fixes.
+
 config HTC_FD_MONITOR
 	bool "fd operation monitor mechanism"
 	default n
@@ -1454,12 +1616,6 @@ config MSM_SMD_DEBUG
 	help
 	  Support for debugging the SMD for communication
 	  between the ARM9 and ARM11
-
-config MSM_SEND_SIGNAL_DEBUG
-        bool "MSM send_signal debug support"
-        help
-          This option enables kernel debug log and dump_stack
-          if any processes send signal to assinged processes
 
 config MSM_SDIO_AL
 	depends on ((ARCH_MSM7X30 || MACH_MSM8X60_FUSN_FFA || MACH_TYPE_MSM8X60_FUSION) && HAS_WAKELOCK)
@@ -2448,6 +2604,18 @@ config MSM8930_ONLY
 		help
 		 Help to separate MSM8930 code from other ARCH
 
+config AUDIO_LOW_LATENCY
+		default n
+		bool "For AUDIO_LOW_LATENCY only"
+		help
+		 Help to separate the AUDIO_LOW_LATENCY from other board config
+
+config AUDIO_24BIT
+		default n
+		bool "For AUDIO_24BIT only"
+		help
+		 Help to separate the AUDIO_24BIT from other board config
+
 config MSM_QDSP6_APR
 	bool "Audio QDSP6 APR support"
 	depends on MSM_SMD
@@ -2556,6 +2724,7 @@ config MSM_OCMEM
 
 config MSM_RTB
 	bool "Register tracing"
+	depends on (!METRICO_TP || METRICO_TP!=y)
 	help
 	  Add support for logging different events to a small uncached
 	  region. This is designed to aid in debugging reset cases where the
@@ -2660,6 +2829,14 @@ config MSM_L2_ERP_2BIT_PANIC
 	  For production builds, it may be acceptable to say 'N' here, since
 	  an uncorrectable error might not necessarily cause further problems.
 
+config IGNORE_L2_FALSE_ALRAM
+	bool "Ignore harmless L2 port error"
+	depends on MSM_CACHE_ERP
+	default y
+	help
+	  L2 cache will sometimes generate port error which is consider harmless.
+	  Ignore the error if trigger rate is low.
+
 config MSM_DCVS
 	bool "Use MSM DCVS for CPU/GPU Frequency control"
 	depends on MSM_SCM
@@ -2685,6 +2862,13 @@ config ACPU_CUSTOM_FREQ_SUPPORT
 	help
 	  Adds support for custom frequency table adjustments.
 
+config ACPU_SPEED_BIN_FREQ_SUPPORT
+	bool "Custom speed bin frequency setting"
+	default n
+	depends on ACPU_CUSTOM_FREQ_SUPPORT
+	help
+	  Add support for adjusting ACPU frequency table according to ACPU speed bin.
+
 config ACPU_MAX_FREQ
 	int "Maximum supported frequency"
 	depends on ACPU_CUSTOM_FREQ_SUPPORT
@@ -2709,6 +2893,12 @@ config MSM_HSIC_SYSMON
 	  Add support for bridging with the system monitor interface of MDM
 	  over HSIC. This driver allows the local system monitor to
 	  communicate with the remote system monitor interface.
+
+config MSM_HSIC_SYSMON_TTY_DEV
+	tristate "MSM HSIC system monitor TTY device"
+	depends on USB && MSM_HSIC_SYSMON
+	help
+	 Add support for using SYSMON interface for specific purpose
 
 config MSM_HSIC_SYSMON_TEST
 	tristate "MSM HSIC system monitor bridge test"
@@ -2798,11 +2988,89 @@ config MACH_M7_DUG
         help
           Support for the HTC APQ8064 M7_DUG.
 
+config MACH_M7_DTU
+        depends on ARCH_APQ8064
+        bool "APQ8064 M7_DTU"
+        help
+          Support for the HTC APQ8064 M7_DTU.
+
+config MACH_M7C_DTU
+        depends on ARCH_APQ8064
+        bool "APQ8064 M7C_DTU"
+        help
+          Support for the HTC APQ8064 M7C_DTU.
+
+config MACH_M7C_DUG
+        depends on ARCH_APQ8064
+        bool "APQ8064 M7C_DUG"
+        help
+          Support for the HTC APQ8064 M7C_DUG.
+
+config MACH_M7C_DWG
+        depends on ARCH_APQ8064
+        bool "APQ8064 M7C_DWG"
+        help
+          Support for the HTC APQ8064 M7C_DWG.
+
+config MACH_T6_TL
+        depends on ARCH_APQ8064
+        bool "APQ8064 T6_TL"
+        help
+          Support for the HTC APQ8064 T6_TL.
+
+config MACH_T6_DUG
+        depends on ARCH_APQ8064
+        bool "APQ8064 T6_DUG"
+        help
+          Support for the HTC APQ8064 T6_DUG.
+
+config MACH_T6_DWG
+        depends on ARCH_APQ8064
+        bool "APQ8064 T6_DWG"
+        help
+          Support for the HTC APQ8064 T6_DWG.
+
 config MACH_M7_EVM
         depends on ARCH_APQ8064
         bool "APQ8064 M7_EVM"
         help
           Support for the HTC APQ8064 M7_EVM.
+
+config MACH_DLXP_WL
+	depends on ARCH_APQ8064
+	bool "APQ8064 DLXP_WL"
+	help
+	  Support for the HTC APQ8064 DLXP_WL.
+
+config MACH_DLXP_UL
+	depends on ARCH_APQ8064
+	bool "APQ8064 DLXP_UL"
+	help
+	  Support for the HTC APQ8064 DLXP_UL.
+
+config MACH_DLXP_U
+	depends on ARCH_APQ8064
+	bool "APQ8064 DLXP_U"
+	help
+	  Support for the HTC APQ8064 DLXP_U.
+
+config MACH_DLP_DUG
+	depends on ARCH_APQ8064
+	bool "APQ8064 DLP_DUG"
+	help
+	  Support for the HTC APQ8064 DLP_DUG.
+
+config MACH_DLP_DWG
+	depends on ARCH_APQ8064
+	bool "APQ8064 DLP_DWG"
+	help
+	  Support for the HTC APQ8064 DLP_DWG.
+
+config MACH_DLP_DTU
+	depends on ARCH_APQ8064
+	bool "APQ8064 DLP_DTU"
+	help
+	  Support for the HTC APQ8064 DLP_DTU.
 
 config QSC_MODEM
         default n
@@ -2876,6 +3144,12 @@ config QUALCOMM_WLAN_PXO
 	bool "Use PXO for WLAN clock source"
 	help
 	  Use PXO for clock source of WLAN chip
+
+config IOEXTENDER
+        default n
+        bool "Enable IOEXTENDER feature"
+	help
+	 To support IOEXTENDER feature
 
 config CMDLINE_OPTIONS
 	bool "Enable cmdline khz/gov/maxscroff command parsing"
